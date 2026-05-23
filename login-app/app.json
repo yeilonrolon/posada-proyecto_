@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Posada Villa Montaña",
+    "slug": "posada-villa-montana-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#525FE1"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.villamontana.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#525FE1"
+      },
+      "package": "com.villamontana.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "androidVariant": "nativeAndroid"
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://192.168.1.111:3001"
+    }
+  }
+}
