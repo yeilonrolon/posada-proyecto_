@@ -257,7 +257,7 @@ app.post('/recuperar-preguntas', async (req, res) => {
     const { usuario } = req.body;
     try {
         const query = `
-            SELECT pregunta1, pregunta2 
+            SELECT pregunta1, respuesta1, pregunta2, respuesta2
             FROM usuarios 
             WHERE LOWER(usuario) = LOWER($1) AND activo = true
         `;
@@ -267,7 +267,9 @@ app.post('/recuperar-preguntas', async (req, res) => {
             res.json({ 
                 success: true, 
                 pregunta1: resultado.rows[0].pregunta1,
-                pregunta2: resultado.rows[0].pregunta2
+                respuesta1: resultado.rows[0].respuesta1,
+                pregunta2: resultado.rows[0].pregunta2,
+                respuesta2: resultado.rows[0].respuesta2
             });
         } else {
             res.json({ success: false, mensaje: "El usuario no existe o está inactivo." });
@@ -289,9 +291,17 @@ app.get('/usuariosinactivos', async (req, res) => {
 
 app.put('/actualizarusuario', async (req,res) =>{
     try {
-        const {id, nombre, rol} = req.body;
-        const query = 'UPDATE usuarios SET nombre = $2, rol = $3 WHERE id = $1';
-        await pool.query(query, [id, nombre, rol]);
+        const { id, nombre, rol, pregunta1, respuesta1, pregunta2, respuesta2 } = req.body;
+        const query = `UPDATE usuarios SET nombre = $2, rol = $3, pregunta1 = $4, respuesta1 = $5, pregunta2 = $6, respuesta2 = $7 WHERE id = $1`;
+        await pool.query(query, [
+            id,
+            nombre,
+            rol,
+            pregunta1 ? pregunta1.trim().toLowerCase() : null,
+            respuesta1 ? respuesta1.trim().toLowerCase() : null,
+            pregunta2 ? pregunta2.trim().toLowerCase() : null,
+            respuesta2 ? respuesta2.trim().toLowerCase() : null
+        ]);
         res.json({success: true, mensaje: 'Datos actualizados.'})
     } catch (error) {
         res.status(500).json({success: false, error: error.message})
@@ -533,7 +543,7 @@ app.post('/actualizar-clave-recuperacion', async (req, res) => {
 // ============================================================
 // 5. ARRANQUE DEL SERVIDOR
 // ============================================================
-const PORT = process.env.PORT || 3000; 
+const PORT = process.env.PORT || 3001; 
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`
@@ -541,7 +551,7 @@ app.listen(PORT, '0.0.0.0', () => {
     🏨 SISTEMA POSADA VILLA MONTAÑA - BACKEND V2
     🟢 Estado: Corriendo
     📍 URL Local: http://localhost:${PORT}
-    📍 Red Local: http://192.168.1.111:${PORT}
+    📍 Red Local: http://192.168.0.108:${PORT}
     ================================================
     `);
 });

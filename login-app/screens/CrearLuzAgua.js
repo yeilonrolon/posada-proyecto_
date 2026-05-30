@@ -4,6 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { estilosLuzAgua } from '../styles/EstilosLuzAgua';
 import { BASE_URL } from './apiConfig';
+import CalcularConsumo from './CalcularConsumo'
 
 /**
  * PANTALLA: REGISTRO DE LUZ Y AGUA
@@ -140,6 +141,9 @@ export default function CrearLuzAgua({ navigation, route }) {
                 <Text style={styles.nota}>
                     Nota: Asegúrese de que el valor sea el que indica el medidor físico en este momento.
                 </Text>
+            </View>
+            <View>
+                <CalcularConsumo />
             </View>
         </ScrollView>
     );

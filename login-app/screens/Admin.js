@@ -19,7 +19,7 @@ export default function Admin({ route, navigation }) {
                     <Text style={styles.subtitulo}>
                         Bienvenido, <Text style={styles.nombreResaltado}>{nombreUsuario || 'Usuario'}</Text>
                     </Text>
-                    <Text style={styles.fechaTexto}>Sesión activa: {new Date().toLocaleDateString()}</Text>
+                    <Text style={styles.fechaTexto}>Ultima sesión vista activa: {new Date().toLocaleDateString()}</Text>
                 </View>
 
                 {/* BOTÓN: REGISTRAR SERVICIOS (LUZ Y AGUA) */}
@@ -35,18 +35,6 @@ export default function Admin({ route, navigation }) {
                     </View>
                 </TouchableOpacity>
 
-                {/* BOTÓN: CÁLCULO DE CONSUMO */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#9b59b6' }]} 
-                    onPress={() => navigation.navigate('CalcularConsumo')} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>🧮</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Cálculo de Consumo</Text>
-                        <Text style={styles.textoSecundario}>Comparativa mensual</Text>
-                    </View>
-                </TouchableOpacity>
 
                 {/* BOTÓN: NUEVO OPERADOR */}
                 <TouchableOpacity 

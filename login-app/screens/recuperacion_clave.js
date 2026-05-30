@@ -174,7 +174,7 @@ export default function RecuperacionClave({ navigation }) {
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Usuario</Text>
                                     <TextInput 
-                                        placeholder="Ej. yeilon" 
+                                        placeholder="Ejemplo: Usuario..." 
                                         placeholderTextColor="#cbd5e1"
                                         onChangeText={setUsuario}
                                         value={usuario}
