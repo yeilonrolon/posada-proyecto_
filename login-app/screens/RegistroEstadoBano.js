@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useState,useEffect, useCallback } from "react";
 import { Text, View, TextInput, TouchableOpacity,ScrollView, Switch, Alert,ActivityIndicator, Keyboard } from "react-native";
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
@@ -9,7 +9,7 @@ export default function RegistroEstadoBano ({navigation, route}){
 
     const API_URL = BASE_URL;
 
-    const {idUsuario} = route.params || {};
+    const {idUsuario, item} = route.params || {};
     const [habitaciones, setHabitaciones] = useState([]);
     const [selecionadaHabitacion, setSelecionadaHabitacion] = useState("");
     const [observacion, setObservacion] = useState("");
@@ -17,22 +17,33 @@ export default function RegistroEstadoBano ({navigation, route}){
     const [problemas, setProblemas] = useState(false);
     const [cargando, setCargando] = useState(false);
 
+    useEffect(() => {
+            if (item) {
+                setSelecionadaHabitacion(item.num_habitacion);
+                setEstado(item.estado);
+                setObservacion(item.observaciones);
+                if (item.observaciones && item.observaciones !== "") {
+                setProblemas(true);
+                }
+            }
+        }, [item]);
     
 
-    const listarHabitaciones = async () =>{
-        try{
+    const listarHabitaciones = useCallback(async () => {
+        try {
             const res = await axios.get(`${API_URL}/listar-habitaciones`);
-            setHabitaciones(res.data.habitacion|| [])
-        }
-        catch(error){
-            console.error('Error en listdao de habitaciones:', error);
+            setHabitaciones(res.data.habitacion || []);
+        } catch (error) {
+            console.error('Error en listado de habitaciones:', error);
             Alert.alert("Error de Red", "No se pudo conectar con el servidor. Verifica que esté encendido.");
-            setHabitaciones([])
+            setHabitaciones([]);
         }
-    }
+    }, [API_URL]);
 
     const estadoHabitacion = async () =>{
         try{
+            
+            
             const res = await axios.put(`${API_URL}/estado-habitacion`,{
                 estado:estado,
                 habitacion:selecionadaHabitacion
@@ -66,7 +77,10 @@ export default function RegistroEstadoBano ({navigation, route}){
                     return Alert.alert("Error de Sesión", "No se detectó el ID del usuario. Por favor, reincia sesión.");
             }
         try {
-            const res = await axios.post(`${API_URL}/estado-bano`, {
+            const funcion = item && item.id_estado;
+            const url = funcion ? `${API_URL}/editar-estado/${item.id_estado}` : `${API_URL}/estado-bano`;
+            const metodo = funcion ? 'put' : 'post';
+            const res = await axios[metodo](url, {
                 habitacion: selecionadaHabitacion,
                 estado: estado,
                 observacion: observacion,

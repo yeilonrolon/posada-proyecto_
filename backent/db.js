@@ -10,7 +10,7 @@ if (!dbPassword || typeof dbPassword !== 'string' || dbPassword.trim() === '') {
 const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
-    database: 'posada_restaurada_bd', // Base de datos del proyecto
+    database: 'posada_mantenimiento', // Base de datos del proyecto
     password: dbPassword,
     port: 5432,
     allowExitOnIdle: false,

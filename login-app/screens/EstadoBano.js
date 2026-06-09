@@ -88,6 +88,16 @@ export default function EstadoBano({ navigation, route }) {
                 <Text style={styles.observacion}>{item.observaciones} </Text>
                 <Text style={styles.usuarioTexto}>Registrado por: {item.nombre}</Text>
             </View>
+            <View style={{ flexDirection: 'row', marginTop: 12, gap: 10 }}>
+            
+            {rol == "Admin" && (
+            <TouchableOpacity 
+                onPress={() => navigation.navigate('RegistroEstadoBano', { idUsuario, item,rol })} 
+                style={{flex: 1,backgroundColor: '#525FE1', paddingVertical: 10,borderRadius: 6,alignItems: 'center',justifyContent: 'center'}}>
+                <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 14 }}>Editar</Text>
+            </TouchableOpacity>
+            )}
+            </View>
         </View>
     );
 

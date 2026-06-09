@@ -4,7 +4,7 @@ import {
     Image, ScrollView, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios'; // 🟢 CORREGIDO: Importación correcta desde su propia dependencia
+import axios from 'axios'; 
 import { BASE_URL } from './apiConfig';
 
 /**

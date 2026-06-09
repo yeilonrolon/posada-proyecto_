@@ -20,6 +20,8 @@ import EstadoBano from './screens/EstadoBano';
 import MenuInferior from './MenuInferior';
 import Habitaciones from './screens/Habitaciones';
 import RecuperacionClave from './screens/recuperacion_clave';
+import RegistroCosto from './screens/RegistroCostoReparacion';
+import CostoReparacion from './screens/CostoReparacion';
 
 const Stack = createStackNavigator();
 
@@ -138,6 +140,16 @@ export default function App() {
             title: 'RECUPERACIÓN DE CLAVE', 
             headerRight: null 
           }}
+          />
+          <Stack.Screen 
+            name="RegistroCosto" 
+            component={RegistroCosto} 
+            options={{ title: 'REGISTRO DE COSTOS EXTRAS', headerRight: null }}
+          />
+          <Stack.Screen 
+            name="CostoReparacion" 
+            component={CostoReparacion} 
+            options={{ title: 'HISTORIAL DE COSTOS DE REPARACION', headerRight: null }}
           />
 
         </Stack.Navigator>

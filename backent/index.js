@@ -346,6 +346,34 @@ app.post('/estado-bano', async(req,res) =>{
     }
 });
 
+app.put('/editar-estado/:id', async (req, res) => {
+    try {
+        const { id } = req.params; 
+        const { habitacion, estado, observacion, registrado_por } = req.body;
+        const query = `UPDATE estado_banos SET num_habitacion = $1, estado = $2, observaciones = $3, fecha_inspeccion = NOW(),revisado_por = $4 WHERE id_estado = $5 `;
+
+        const resultado = await pool.query(query, [habitacion, estado, observacion, registrado_por, id]);
+
+        if (resultado.rowCount === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                mensaje: 'No se encontró el reporte de baño para actualizar.' 
+            });
+        }
+        res.status(200).json({ 
+            success: true, 
+            mensaje: 'Reporte de baño actualizado correctamente.' 
+            });
+
+    } catch (error) {
+        console.error('Error al modificar el estado del baño:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 app.put('/estado-habitacion', async(req,res) =>{
     try{
         const{estado,habitacion} = req.body
@@ -540,10 +568,105 @@ app.post('/actualizar-clave-recuperacion', async (req, res) => {
     }
 });
 
+// ==========================================
+// MÓDULO 7: REGISTRO DE COSTOS EXTRAS
+// ==========================================
+app.get('/listar-habitaciones-inactivas', async (req, res) =>{
+    try{
+        const query = "select id_habitacion from habitacion where estado = 'Inactivo'  order by id_habitacion asc   "
+        const resultado = await pool.query(query)
+        res.json({
+            success: true,
+            habitacion: resultado.rows,
+        })
+    } catch(error){
+        console.error("Error listar habitaciones:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/registro-costo', async(req,res) =>{
+    try{
+        const {ubicacion,servicio,cedula,nombre,telefono,costo,materiales,costoFinal,moneda,registrado_por} = req.body
+        const query = `insert into costo_manterimiento(ubicacion, servicio, cedula,nombre, telefono, costo, materiales, fecha_registro, costo_final,moneda, revisado_por) 
+        values ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9,$10)`
+        await pool.query(query,[ubicacion,servicio,cedula || null,nombre || null,telefono || null ,costo || null,materiales,costoFinal,moneda,registrado_por])
+        res.status(201).json({ success: true, mensaje: 'Reporte guardado correctamente.' });
+    } catch(error){
+        console.error("--- ERROR EN POSTGRESQL ---");
+        console.error(error); 
+        console.error("---------------------------");
+        res.status(500).json({ 
+            success: false, 
+            error: error.detail || error.message || "Error interno del servidor" 
+        });
+    }
+});
+app.get('/listar-costo-reparacion', async (req, res) =>{
+    try{
+        const query = `
+            SELECT 
+                c.id_costo, 
+                c.ubicacion, 
+                c.servicio, 
+                c.cedula, 
+                c.nombre as nombre_contratado, 
+                c.telefono, 
+                c.costo, 
+                c.materiales, 
+                TO_CHAR(c.fecha_registro, 'DD/MM/YYYY hh:mi AM') as fecha_lista,
+                c.costo_final, 
+                c.moneda,
+                u.nombre as registrado_por
+            FROM costo_manterimiento c
+            JOIN usuarios u ON c.revisado_por = u.id
+            ORDER BY c.fecha_registro DESC 
+            LIMIT 30
+        `;
+        const resultado = await pool.query(query)
+        res.json({
+            success: true,
+            habitacion: resultado.rows,
+        })
+    } catch(error){
+        console.error("--- ERROR EN POSTGRESQL ---");
+        console.error(error); 
+        console.error("---------------------------");
+        res.status(500).json({ 
+            success: false, 
+            error: error.detail || error.message || "Error interno del servidor" 
+        });
+        //console.error("Error listar costos:", error.message);
+        //res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+app.put('/editar-costo/:id', async (req, res) => {
+    try {
+        const { id } = req.params; // Saca el id_costo de la URL
+        const { ubicacion, servicio, cedula, nombre, telefono, costo, materiales, costoFinal, moneda, registrado_por } = req.body;
+
+        const query = `
+            UPDATE costo_manterimiento 
+            SET 
+                ubicacion = $1, servicio = $2, cedula = $3, nombre = $4, telefono = $5, 
+                costo = $6, materiales = $7, costo_final = $8, moneda = $9, revisado_por = $10
+            WHERE id_costo = $11
+        `;
+
+        const resultado = await pool.query(query, [ubicacion, servicio, cedula || null, nombre || null, telefono || null, costo || null, materiales, costoFinal, moneda, registrado_por,id  ]);
+
+        res.status(200).json({ success: true, mensaje: 'Reporte actualizado correctamente.' });
+    } catch (error) {
+        console.error("Error al editar:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ============================================================
 // 5. ARRANQUE DEL SERVIDOR
 // ============================================================
-const PORT = process.env.PORT || 3001; 
+const PORT = process.env.PORT || 3000; 
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`

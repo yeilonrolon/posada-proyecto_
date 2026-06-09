@@ -97,7 +97,7 @@ export default function Admin({ route, navigation }) {
                 >
                     <View style={styles.circuloIcono}><Text style={styles.icono}>🚽</Text></View>
                     <View>
-                        <Text style={styles.textoBoton}>Historial de Estados de Baños</Text>
+                        <Text style={styles.textoBoton}>Registro de Estados de Baños</Text>
                         <Text style={styles.textoSecundario}>Auditoría de Estados de Baños</Text>
                     </View>
                 </TouchableOpacity>
@@ -113,6 +113,18 @@ export default function Admin({ route, navigation }) {
                     <View>
                         <Text style={styles.textoBoton}>Historial de Estados de Habitaciones</Text>
                         <Text style={styles.textoSecundario}>Auditoría de Estados de Habitaciones</Text>
+                    </View>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#12f3c6' }]} 
+                    // 3. RECOMENDACIÓN: Pasamos el 'rol' también aquí por si acaso lo usas luego
+                    onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })} 
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.circuloIcono}><Text style={styles.icono}>💵</Text></View>
+                    <View>
+                        <Text style={styles.textoBoton}>Regitros de Costos de Repacion de Habitaciones</Text>
+                        <Text style={styles.textoSecundario}>Auditoría de Costos de Reparacion</Text>
                     </View>
                 </TouchableOpacity>
 

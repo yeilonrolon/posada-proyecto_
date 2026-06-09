@@ -3,13 +3,15 @@ import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Mantenimiento from "./screens/Mantenimiento";
 import EstadoBano from './screens/EstadoBano';
 import Habitaciones from './screens/Habitaciones';
+import CostoReparacion from './screens/CostoReparacion';
+import PantallaPrincipal from './screens/qr';
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 const Tab = createBottomTabNavigator();
 
 export default function MenuInferior({route, navigation}) {
-    const {idUsuario,nombreUsuario} = route.params || {};
+    const {idUsuario,nombreUsuario, rol} = route.params || {};
   return (
     <Tab.Navigator 
               screenOptions={{
@@ -35,9 +37,13 @@ export default function MenuInferior({route, navigation}) {
                   </TouchableOpacity>
                 ),
               }}>
-      <Tab.Screen name="MantenimientoTab" component={Mantenimiento}  initialParams={{idUsuario,nombreUsuario}} options={{ title: 'PANEL MANTENIMIENTO', tabBarIcon:() =>(<MaterialIcons name="energy-savings-leaf" size={24} color="black" />) }}/>
-      <Tab.Screen name="EstadoBanoTab" component={EstadoBano} initialParams={{idUsuario,nombreUsuario}} options={{title: 'ESTADOS DE BAÑOS', tabBarIcon:() =>(<MaterialIcons name="bathroom" size={24} color="black" />)}} />
-      <Tab.Screen name="HabitacionesTab" component={Habitaciones} initialParams={{idUsuario,nombreUsuario}} options={{title: 'HABITACIONES', tabBarIcon:() =>(<MaterialIcons name="airline-seat-individual-suite" size={24} color="black" />)}} />
+      <Tab.Screen name="MantenimientoTab" component={Mantenimiento}  initialParams={{idUsuario,nombreUsuario}} options={{ title: 'PANEL DE MANTENIMIENTO', tabBarLabel: 'Manterimiento',tabBarIcon:() =>(<MaterialIcons name="energy-savings-leaf" size={20} color="black" />) }}/>
+      <Tab.Screen name="EstadoBanoTab" component={EstadoBano} initialParams={{idUsuario,nombreUsuario}} options={{title: 'ESTADOS DE BAÑOS', tabBarLabel: 'Baños', tabBarIcon:() =>(<MaterialIcons name="bathroom" size={24} color="black" />)}} />
+      <Tab.Screen name="HabitacionesTab" component={Habitaciones} initialParams={{idUsuario,nombreUsuario}} options={{title: 'ESTADOS DE HABITACIONES',tabBarLabel: 'Habitaciones', tabBarIcon:() =>(<MaterialIcons name="airline-seat-individual-suite" size={20} color="black" />)}} />
+      <Tab.Screen name="CostoReparacionTab" component={CostoReparacion} initialParams={{idUsuario, nombreUsuario, rol}} options={{title: 'COSTOS EXTRAS', tabBarLabel: 'Costos extras',tabBarIcon:() =>(<MaterialIcons name="money" size={20} color="black"/>)}} />
+      <Tab.Screen name="PantallaQr" component={PantallaPrincipal} initialParams={{idUsuario, nombreUsuario, rol}} options={{title: 'PANTALLA QR', tabBarLabel: 'Qr',tabBarIcon:() =>(<MaterialIcons name="qr-code-2" size={20} color="black"/>)}} />
+  
+    
     </Tab.Navigator>
   );
 }
