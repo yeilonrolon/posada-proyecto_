@@ -2,6 +2,7 @@
  * SISTEMA DE GESTIÓN - POSADA VILLA MONTAÑA
  * Backend Principal (Node.js + Express + PostgreSQL)
  * Desarrollado por: Yeilon Rolón
+ * Versión: Con Control de Intentos Avanzado
  */
 
 const express = require('express');
@@ -147,51 +148,96 @@ app.get('/listagastos', async (req, res) => {
 });
 
 // ============================================================
-// 2. MÓDULO DE USUARIOS Y SEGURIDAD
+// 2. MÓDULO DE USUARIOS Y SEGURIDAD (LOGÍN DE INTENTOS CORREGIDO)
 // ============================================================
 
 app.post('/login', async (req, res) => {
     const { usuario, clave } = req.body;
-    try {
-        // Forzamos la búsqueda en minúscula para evitar problemas de tipeo
-        const queryBusqueda = 'SELECT * FROM usuarios WHERE LOWER(usuario) = LOWER($1) AND clave = $2 AND activo = true';
-        const resultado = await pool.query(queryBusqueda, [usuario.trim(), clave]);
+    
+    if (!usuario || !clave) {
+        return res.json({ success: false, mensaje: "Usuario y contraseña requeridos." });
+    }
 
-        if (resultado.rows.length > 0) {
-            const user = resultado.rows[0];
+    const usuarioKey = usuario.trim().toLowerCase();
+
+    try {
+        // 1. Buscamos al usuario por su nombre para verificar sus datos
+        const queryUsuario = 'SELECT id, nombre, rol, activo, clave, intentos, bloqueado FROM usuarios WHERE LOWER(usuario) = $1';
+        const resUsuario = await pool.query(queryUsuario, [usuarioKey]);
+
+        // Si no existe el usuario en la BD
+        if (resUsuario.rows.length === 0) {
+            return res.json({ success: false, mensaje: "Usuario o contraseña incorrectos." });
+        }
+
+        const user = resUsuario.rows[0];
+
+        // 2. Verificamos si ya está marcado como bloqueado en la BD (o si está inactivo por el admin)
+        if (user.bloqueado || !user.activo) {
+            return res.json({ 
+                success: false, 
+                bloqueado: true,
+                mensaje: "Usuario bloqueado. Has agotado tus intentos permitidos. Utiliza la opción de recuperar contraseña para restablecer tu cuenta." 
+            });
+        }
+
+        // 3. SI LA CONTRASEÑA ES CORRECTA
+        if (user.clave === clave) {
+            // Si el usuario tenía intentos acumulados, los limpiamos en la BD
+            if (user.intentos > 0) {
+                await pool.query('UPDATE usuarios SET intentos = 0 WHERE id = $1', [user.id]);
+            }
+
+            // Registrar el acceso exitoso en la tabla de logs
             const queryLog = `INSERT INTO registros_acceso (usuario_id, nombre_usuario) VALUES ($1, $2)`;
             await pool.query(queryLog, [user.id, user.nombre]);
 
-            res.json({
+            return res.json({
                 success: true,
                 id_usuario: user.id,
                 rol: user.rol,
                 nombre: user.nombre
             });
+            
         } else {
-            res.json({ success: false, mensaje: "Credenciales inválidas o usuario desactivado." });
+            // 4. SI LA CONTRASEÑA ES INCORRECTA
+            const nuevosIntentos = user.intentos + 1;
+
+            if (nuevosIntentos >= 3) {
+                // Ha fallado 3 veces: Forzamos el bloqueo de la cuenta en PostgreSQL
+                const queryBloqueoTotal = `
+                    UPDATE usuarios 
+                    SET intentos = $1, bloqueado = true, activo = false 
+                    WHERE id = $2
+                `;
+                await pool.query(queryBloqueoTotal, [nuevosIntentos, user.id]);
+
+                return res.json({
+                    success: false,
+                    bloqueado: true,
+                    mensaje: "Usuario bloqueado. Has agotado tus 3 intentos. Utiliza la opción de recuperar contraseña."
+                });
+            } else {
+                // Todavía le quedan intentos: Guardamos el nuevo número de intentos en la BD
+                await pool.query('UPDATE usuarios SET intentos = $1 WHERE id = $2', [nuevosIntentos, user.id]);
+
+                const visualIntentosRestantes = 3 - nuevosIntentos;
+
+                return res.json({
+                    success: false,
+                    intentosRestantes: visualIntentosRestantes,
+                    mensaje: `Contraseña incorrecta. Te quedan ${visualIntentosRestantes} ${visualIntentosRestantes === 1 ? 'intento' : 'intentos'}.`
+                });
+            }
         }
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-app.get('/historial-accesos', async (req, res) => {
-    try {
-        const query = `
-            SELECT id, nombre_usuario, TO_CHAR(fecha_hora, 'DD/MM/YYYY HH:MI:SS AM') as fecha_formateada
-            FROM registros_acceso 
-            ORDER BY fecha_hora DESC LIMIT 20
-        `;
-        const resultado = await pool.query(query);
-        res.json({ success: true, datos: resultado.rows });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error("Error en módulo de Login/Seguridad:", err.message);
+        res.status(500).json({ success: false, error: "Error interno del servidor en el inicio de sesión." });
     }
 });
 
 // ============================================================
-// 3. MÓDULO ADMINISTRATIVO (CRUD USUARIOS + TEXT PLANO)
+// 3. MÓDULO ADMINISTRATIVO (CRUD USUARIOS)
 // ============================================================
 
 app.post('/crearusuario', async (req, res) => {
@@ -203,14 +249,13 @@ app.post('/crearusuario', async (req, res) => {
             return res.json({ success: false, mensaje: "El nombre de usuario ya existe." });
         }
 
-        // Estructura limpia adaptada a VARCHAR(250)
         const query = `
             INSERT INTO usuarios (
                 nombre, usuario, clave, rol, 
                 pregunta1, respuesta1, 
                 pregunta2, respuesta2, 
-                activo
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+                activo, intentos, bloqueado
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, 0, false)
         `;
         
         await pool.query(query, [
@@ -249,10 +294,6 @@ app.get('/listausuarios', async (req, res) => {
     }
 });
 
-/**
- * RUTA ADAPTADA: Obtener preguntas de seguridad en texto plano
- * Envía directamente los strings guardados para la recuperación
- */
 app.post('/recuperar-preguntas', async (req, res) => {
     const { usuario } = req.body;
     try {
@@ -311,9 +352,10 @@ app.put('/actualizarusuario', async (req,res) =>{
 app.put('/reactivarusuario', async (req, res) => {
     try {
         const { id } = req.body;
-        const query = 'UPDATE usuarios SET activo = true WHERE id = $1';
+        // Al reactivarlo de forma manual, le limpiamos también los bloqueos e intentos
+        const query = 'UPDATE usuarios SET activo = true, bloqueado = false, intentos = 0 WHERE id = $1';
         await pool.query(query, [id]);
-        res.json({ success: true, mensaje: 'Usuario reactivado correctamente.' });
+        res.json({ success: true, mensaje: 'Usuario reactivado y desbloqueado correctamente.' });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -331,7 +373,7 @@ app.put('/eliminarusuario', async(req,res) =>{
 });
 
 // ============================================================
-// 4. MÓDULO DE ESTADOS
+// 4. MÓDULO DE ESTADOS (HABITACIONES Y BAÑOS)
 // ============================================================
 
 app.post('/estado-bano', async(req,res) =>{
@@ -447,11 +489,10 @@ app.post('/registrar-habitacion', async (req,res) =>{
     }
 });
 
-// ==========================================
-// MÓDULO 6: RECUPERACIÓN DE CONTRASEÑA
-// ==========================================
+// ============================================================
+// 5. MÓDULO DE RECUPERACIÓN DE CONTRASEÑA (SOPORTE DE COLUMNAS)
+// ============================================================
 
-// 1. Verificar existencia del usuario y obtener sus preguntas
 app.post('/verificar-usuario-recuperacion', async (req, res) => {
     let { usuario } = req.body;
 
@@ -462,24 +503,18 @@ app.post('/verificar-usuario-recuperacion', async (req, res) => {
     try {
         usuario = usuario.trim().toLowerCase();
         
-        // 🟢 Corregido: Cambiado 'id_usuario' por 'id' y 'estado' por 'activo' para acoplarse a tu BD
         const resultado = await pool.query(
-            'SELECT id, pregunta1, pregunta2, activo FROM usuarios WHERE LOWER(usuario) = $1',
+            'SELECT id, pregunta1, pregunta2, activo, bloqueado, intentos FROM usuarios WHERE LOWER(usuario) = $1',
             [usuario]
         );
 
         if (resultado.rows.length === 0) {
-            return res.json({ success: false, mensaje: "El usuario ingresado no existe en el sistema." });
+            return res.json({ success: false, mensaje: "Usuario o contraseña incorrectos." });
         }
 
         const user = resultado.rows[0];
 
-        // 🟢 Corregido: Tu BD usa la columna 'activo' (true/false)
-        if (user.activo === false) {
-            return res.json({ success: false, mensaje: "Esta cuenta se encuentra inactiva. Contacta al administrador." });
-        }
-
-        if (!user.pregunta1 || !user.pregunta2) {
+        if (user.pregunta1 === null || user.pregunta2 === null) {
             return res.json({ 
                 success: false, 
                 mensaje: "Tu cuenta no posee preguntas de seguridad registradas. Solicita asistencia técnica con el Administrador." 
@@ -489,7 +524,7 @@ app.post('/verificar-usuario-recuperacion', async (req, res) => {
         return res.json({
             success: true,
             datos: {
-                id: user.id, // 🟢 Corregido: Cambiado id_usuario por id
+                id: user.id, 
                 pregunta1: user.pregunta1,
                 pregunta2: user.pregunta2
             }
@@ -501,7 +536,6 @@ app.post('/verificar-usuario-recuperacion', async (req, res) => {
     }
 });
 
-// 2. Verificar que las respuestas coincidan con la BD
 app.post('/verificar-respuestas', async (req, res) => {
     let { id, respuesta1, respuesta2 } = req.body;
 
@@ -510,7 +544,6 @@ app.post('/verificar-respuestas', async (req, res) => {
     }
 
     try {
-        // 🟢 Corregido: Cambiado id_usuario por id
         const resultado = await pool.query(
             'SELECT respuesta1, respuesta2 FROM usuarios WHERE id = $1',
             [id]
@@ -540,7 +573,6 @@ app.post('/verificar-respuestas', async (req, res) => {
     }
 });
 
-// 3. Actualizar la contraseña en la base de datos (Texto Plano)
 app.post('/actualizar-clave-recuperacion', async (req, res) => {
     const { id, nuevaClave } = req.body;
 
@@ -549,15 +581,16 @@ app.post('/actualizar-clave-recuperacion', async (req, res) => {
     }
 
     try {
-        // 🟢 CORREGIDO: Se elimina la encriptación bcrypt para guardar la clave 
-        // en texto plano, tal como lo maneja tu /login y /crearusuario
-        const resultado = await pool.query(
-            'UPDATE usuarios SET clave = $1 WHERE id = $2',
-            [nuevaClave.trim(), id]
-        );
+        // Al actualizar de forma exitosa la clave, ponemos en limpio la cuenta
+        const queryRestablecer = `
+            UPDATE usuarios 
+            SET clave = $1, activo = true, bloqueado = false, intentos = 0 
+            WHERE id = $2
+        `;
+        const resultado = await pool.query(queryRestablecer, [nuevaClave.trim(), id]);
 
         if (resultado.rowCount > 0) {
-            return res.json({ success: true, mensaje: "La contraseña ha sido reestablecida con éxito." });
+            return res.json({ success: true, mensaje: "La contraseña ha sido reestablecida con éxito. Cuenta desbloqueada." });
         } else {
             return res.json({ success: false, mensaje: "No se pudo actualizar la contraseña. Usuario no válido." });
         }
@@ -569,10 +602,11 @@ app.post('/actualizar-clave-recuperacion', async (req, res) => {
 });
 
 // ==========================================
-// MÓDULO 7: REGISTRO DE COSTOS EXTRAS
+// 6. MÓDULO DE REGISTRO DE COSTOS EXTRAS
 // ==========================================
+
 app.get('/listar-habitaciones-inactivas', async (req, res) =>{
-    try{
+    try {
         const query = "select id_habitacion from habitacion where estado = 'Inactivo'  order by id_habitacion asc   "
         const resultado = await pool.query(query)
         res.json({
@@ -584,6 +618,7 @@ app.get('/listar-habitaciones-inactivas', async (req, res) =>{
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 app.post('/registro-costo', async(req,res) =>{
     try{
         const {ubicacion,servicio,cedula,nombre,telefono,costo,materiales,costoFinal,moneda,registrado_por} = req.body
@@ -601,6 +636,7 @@ app.post('/registro-costo', async(req,res) =>{
         });
     }
 });
+
 app.get('/listar-costo-reparacion', async (req, res) =>{
     try{
         const query = `
@@ -635,15 +671,12 @@ app.get('/listar-costo-reparacion', async (req, res) =>{
             success: false, 
             error: error.detail || error.message || "Error interno del servidor" 
         });
-        //console.error("Error listar costos:", error.message);
-        //res.status(500).json({ success: false, error: error.message });
     }
 });
 
-
 app.put('/editar-costo/:id', async (req, res) => {
     try {
-        const { id } = req.params; // Saca el id_costo de la URL
+        const { id } = req.params; 
         const { ubicacion, servicio, cedula, nombre, telefono, costo, materiales, costoFinal, moneda, registrado_por } = req.body;
 
         const query = `
@@ -654,7 +687,7 @@ app.put('/editar-costo/:id', async (req, res) => {
             WHERE id_costo = $11
         `;
 
-        const resultado = await pool.query(query, [ubicacion, servicio, cedula || null, nombre || null, telefono || null, costo || null, materiales, costoFinal, moneda, registrado_por,id  ]);
+        await pool.query(query, [ubicacion, servicio, cedula || null, nombre || null, telefono || null, costo || null, materiales, costoFinal, moneda, registrado_por, id]);
 
         res.status(200).json({ success: true, mensaje: 'Reporte actualizado correctamente.' });
     } catch (error) {
@@ -664,7 +697,13 @@ app.put('/editar-costo/:id', async (req, res) => {
 });
 
 // ============================================================
-// 5. ARRANQUE DEL SERVIDOR
+// 7. MÓDULO INTEGRADO: CONTROL DE EQUIPOS POR QR
+// ============================================================
+const equiposRoutes = require('./routers/backent-qr');
+app.use('/api/equipos', equiposRoutes);
+
+// ============================================================
+// 8. ARRANQUE DEL SERVIDOR
 // ============================================================
 const PORT = process.env.PORT || 3000; 
 
@@ -672,10 +711,9 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`
     ================================================
     🏨 SISTEMA POSADA VILLA MONTAÑA - BACKEND V2
-    🟢 Estado: Corriendo
+    🟢 Estado: Corriendo con Seguridad de Intentos
     📍 URL Local: http://localhost:${PORT}
-    📍 Red Local: http://192.168.0.108:${PORT}
+    📍 Red Local: http://192.168.0.197:${PORT}
     ================================================
     `);
 });
-

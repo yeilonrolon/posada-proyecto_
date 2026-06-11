@@ -1,12 +1,12 @@
 import React from 'react';
 import { Text, StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-
+import { FontAwesome } from '@expo/vector-icons';
 /**
  * PANTALLA: PANEL ADMINISTRATIVO
  * Función: Menú principal con acceso a todas las gestiones del sistema.
  */
 export default function Admin({ route, navigation }) {
-    // 1. CORRECCIÓN: Extraemos también el 'rol' que viene desde el Login
+    // Extraemos las credenciales y el rol que vienen desde el Login
     const { idUsuario, nombreUsuario, rol } = route.params || {};
 
     return (
@@ -19,7 +19,7 @@ export default function Admin({ route, navigation }) {
                     <Text style={styles.subtitulo}>
                         Bienvenido, <Text style={styles.nombreResaltado}>{nombreUsuario || 'Usuario'}</Text>
                     </Text>
-                    <Text style={styles.fechaTexto}>Ultima sesión vista activa: {new Date().toLocaleDateString()}</Text>
+                    <Text style={styles.fechaTexto}>Última sesión vista activa: {new Date().toLocaleDateString()}</Text>
                 </View>
 
                 {/* BOTÓN: REGISTRAR SERVICIOS (LUZ Y AGUA) */}
@@ -34,7 +34,6 @@ export default function Admin({ route, navigation }) {
                         <Text style={styles.textoSecundario}>Lecturas de Luz y Agua</Text>
                     </View>
                 </TouchableOpacity>
-
 
                 {/* BOTÓN: NUEVO OPERADOR */}
                 <TouchableOpacity 
@@ -91,7 +90,6 @@ export default function Admin({ route, navigation }) {
                 {/* BOTÓN: HISTORIAL DE ESTADOS DE BAÑOS */}
                 <TouchableOpacity 
                     style={[styles.boton, { marginTop: 20, backgroundColor: '#d9f312' }]} 
-                    // 2. CORRECCIÓN: Añadimos ', rol' aquí para que llegue a la vista de Baños
                     onPress={() => navigation.navigate('EstadoBano', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >
@@ -105,7 +103,6 @@ export default function Admin({ route, navigation }) {
                 {/* BOTÓN: HISTORIAL DE ESTADOS DE HABITACIONES */}
                 <TouchableOpacity 
                     style={[styles.boton, { marginTop: 20, backgroundColor: '#12f3c6' }]} 
-                    // 3. RECOMENDACIÓN: Pasamos el 'rol' también aquí por si acaso lo usas luego
                     onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >
@@ -115,16 +112,35 @@ export default function Admin({ route, navigation }) {
                         <Text style={styles.textoSecundario}>Auditoría de Estados de Habitaciones</Text>
                     </View>
                 </TouchableOpacity>
+
+                {/* BOTÓN: REGISTROS DE COSTOS DE REPARACIÓN */}
                 <TouchableOpacity 
                     style={[styles.boton, { marginTop: 20, backgroundColor: '#12f3c6' }]} 
-                    // 3. RECOMENDACIÓN: Pasamos el 'rol' también aquí por si acaso lo usas luego
                     onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >
                     <View style={styles.circuloIcono}><Text style={styles.icono}>💵</Text></View>
                     <View>
-                        <Text style={styles.textoBoton}>Regitros de Costos de Repacion de Habitaciones</Text>
-                        <Text style={styles.textoSecundario}>Auditoría de Costos de Reparacion</Text>
+                        <Text style={styles.textoBoton}>Registros de Costos de Reparación</Text>
+                        <Text style={styles.textoSecundario}>Auditoría de Costos de Reparación</Text>
+                    </View>
+                </TouchableOpacity>
+
+                {/* AGREGADO - BOTÓN: CONTROL DE ACTIVOS Y CÓDIGOS QR */}
+
+                <TouchableOpacity 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#8e44ad' }]} 
+                    onPress={() => navigation.navigate('qr', { idUsuario, nombreUsuario, rol })} 
+                    activeOpacity={0.7}
+                >
+                    {/* Cambiamos el Text por el componente de Icono FontAwesome */}
+                    <View style={styles.circuloIcono}>
+                        <FontAwesome name="qrcode" size={24} color="white" />
+                    </View>
+                    
+                    <View>
+                        <Text style={styles.textoBoton}>Gestión de Equipos y QR</Text>
+                        <Text style={styles.textoSecundario}>Inventario, Etiquetas e Inspección</Text>
                     </View>
                 </TouchableOpacity>
 
@@ -135,8 +151,6 @@ export default function Admin({ route, navigation }) {
     );
 }
 
-
-
 const styles = StyleSheet.create({
     contenedor: { 
         flex: 1, 
@@ -144,7 +158,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
-        paddingBottom: 40 // Espacio extra al final para que no choque con el footer
+        paddingBottom: 40 
     },
     header: { 
         marginBottom: 30,
@@ -175,8 +189,8 @@ const styles = StyleSheet.create({
         borderRadius: 20, 
         flexDirection: 'row', 
         alignItems: 'center', 
-        elevation: 4, // Sombra en Android
-        shadowColor: '#000', // Sombra en iOS
+        elevation: 4, 
+        shadowColor: '#000', 
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,

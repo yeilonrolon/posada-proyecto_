@@ -22,6 +22,9 @@ import Habitaciones from './screens/Habitaciones';
 import RecuperacionClave from './screens/recuperacion_clave';
 import RegistroCosto from './screens/RegistroCostoReparacion';
 import CostoReparacion from './screens/CostoReparacion';
+import PantallaCamara from './screens/PantallaCamara';
+import PantallaListaQR from './screens/PantallaListaQR';
+import qr from './screens/qr';
 
 const Stack = createStackNavigator();
 
@@ -151,6 +154,21 @@ export default function App() {
             component={CostoReparacion} 
             options={{ title: 'HISTORIAL DE COSTOS DE REPARACION', headerRight: null }}
           />
+          <Stack.Screen 
+          name="PantallaCamara" 
+          component={PantallaCamara} 
+          options={{ title: 'Cámara QR' }} 
+        />
+        <Stack.Screen 
+          name="PantallaListaQR" 
+          component={PantallaListaQR} 
+          options={{ title: 'Lista de QR' }} 
+        />
+        <Stack.Screen 
+          name="qr" 
+          component={qr} 
+          options={{ title: 'Control de Activos QR' }} 
+        />
 
         </Stack.Navigator>
         <StatusBar style="light" />

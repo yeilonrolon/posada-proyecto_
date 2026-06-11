@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useCallback} from "react";
-import { View, TouchableOpacity, Text, TextInput, ScrollView, Alert, Keyboard } from "react-native";
+import { View, TouchableOpacity, Text, TextInput, ScrollView, Alert, Keyboard, KeyboardAvoidingView,Platform } from "react-native";
 import { BASE_URL } from './apiConfig';
 import axios from 'axios';
 import { Picker } from "@react-native-picker/picker";
@@ -43,15 +43,23 @@ export default function RegistroCosto({navigation,route}){
             Alert.alert("Error de Red", "No se pudo conectar con el servidor. Verifica que esté encendido.");
             setHabitaciones([])
         }
-    })
+    },[API_URL])
     const presionarBotonGuardar = () => {
     if (!selecionadaHabitacion || !servicio || !moneda || !materiales.trim()) {
       Alert.alert('Campos Incompletos 🛑', 'Por favor complete todos los campos');
       return;
     }
     if(servicio == "Contratado"){
-        if(!nombre.trim() || !cedula.trim() || !telefono.trim() || !costo.trim()){
+        if(!nombre.trim() || !cedula.trim() || !telefono.trim() || !costo.trim() || nombre.trim().length < 5){
             Alert.alert('Campos Incompletos 🛑', 'Por favor complete todos los campos');
+        return;
+    }
+    if(cedula.trim().length < 7 ){
+            Alert.alert('Campos Incompletos 🛑', 'Por favor la cedula debe contar con 7 o mas caracteres');
+        return;
+    }
+    if(telefono.trim().length !== 11){
+            Alert.alert('Campos Incompletos 🛑', 'Por favor el numero de telefono debe contar con 11  caracteres');
         return;
     }
     if (!idUsuario) {
@@ -103,7 +111,7 @@ export default function RegistroCosto({navigation,route}){
                 cedula: cedula?.trim() || null,
                 nombre: nombre?.trim() || null,
                 telefono: telefono?.trim() || null,
-                costo: costoContratado?.trim() || null,
+                costo: costoContratado || null,
                 materiales: materiales,
                 costoFinal: valorNumerico,
                 moneda: moneda,
@@ -140,110 +148,116 @@ export default function RegistroCosto({navigation,route}){
     };
 
     return(
-    <ScrollView style={estiloRegistroCosto.contenedor}>
-        <View style={estiloRegistroCosto.main}>
-            <Text style={estiloRegistroCosto.titulo}>Registro de costos</Text>
-        <View style={estiloRegistroCosto.card}>
-            <View>
-                <Text style={estiloRegistroCosto.label}>Lugar a realizar la reparacion</Text>
-                <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={selecionadaHabitacion}
-                onValueChange={(item) => setSelecionadaHabitacion(item)}
-                >
-                    <Picker.Item label="Seleciona una Ubicacion" value=""/>
-                    <Picker.Item label="Planta baja" value="Planta baja"/>
-                    <Picker.Item label="Planta alta" value="Planta alta"/>                    
-                        {habitaciones.map((h) => (
-                        <Picker.Item  
-                        key={h.id_habitacion}
-                        label={`Habitacion N° ${h.id_habitacion}`}
-                         value={h.id_habitacion}
-                        />
-                         ))}
-                </Picker>
-            </View>
-            <View>
-                <Text style={estiloRegistroCosto.label}>Tipo de servicio, interno o contratado</Text>
-                <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={servicio}
-                onValueChange={(item) => setServico(item)}
-                >
-                    <Picker.Item label="Interno" value="Interno"/>
-                    <Picker.Item label="Se contrato" value="Contratado"/>
-                </Picker>
-
-            </View>
-            {servicio === "Contratado" ? (
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+        >
+        <ScrollView style={estiloRegistroCosto.contenedor}>
+            <View style={estiloRegistroCosto.main}>
+                <Text style={estiloRegistroCosto.titulo}>Registro de costos</Text>
+            <View style={estiloRegistroCosto.card}>
                 <View>
-                    <Text style={estiloRegistroCosto.label}>cedula de contratado</Text>
-                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 10987890"
-                    onChangeText={setCedula}
-                    value={cedula}
-                    placeholderTextColor="#cbd5e1"
-                    />
+                    <Text style={estiloRegistroCosto.label}>Lugar a realizar la reparacion</Text>
+                    <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={selecionadaHabitacion}
+                    onValueChange={(item) => setSelecionadaHabitacion(item)}
+                    >
+                        <Picker.Item label="Seleciona una Ubicacion" value=""/>
+                        <Picker.Item label="Planta baja" value="Planta baja"/>
+                        <Picker.Item label="Planta alta" value="Planta alta"/>                    
+                            {habitaciones.map((h) => (
+                            <Picker.Item  
+                            key={h.id_habitacion}
+                            label={`Habitacion N° ${h.id_habitacion}`}
+                            value={h.id_habitacion}
+                            />
+                            ))}
+                    </Picker>
+                </View>
+                <View>
+                    <Text style={estiloRegistroCosto.label}>Tipo de servicio, interno o contratado</Text>
+                    <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={servicio}
+                    onValueChange={(item) => setServico(item)}
+                    >
+                        <Picker.Item label="Interno" value="Interno"/>
+                        <Picker.Item label="Se contrato" value="Contratado"/>
+                    </Picker>
+
+                </View>
+                {servicio === "Contratado" ? (
+                    <View>
+                        <Text style={estiloRegistroCosto.label}>cedula de contratado</Text>
+                        <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 10987890"
+                        onChangeText={setCedula}
+                        value={cedula}
+                        placeholderTextColor="#cbd5e1"
+                        keyboardType="numeric"
+                        />
+                    
+                        <Text style={estiloRegistroCosto.label}>nombre</Text>
+                        <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. Juan Alejandro Perez Molina"
+                        onChangeText={setNombre}
+                        value={nombre}
+                        multiline={true}
+                        numberOfLines={4}/>
                 
-                    <Text style={estiloRegistroCosto.label}>nombre</Text>
-                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. Juan Alejandro Perez Molina"
-                    onChangeText={setNombre}
-                    value={nombre}
+                        <Text style={estiloRegistroCosto.label}>telefono</Text>
+                        <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 04223451234"
+                        keyboardType="numeric" 
+                        onChangeText={setTelefono}
+                        value={telefono}
+                        />
+                    
+                        <Text style={estiloRegistroCosto.label}>costo de contratarlo</Text>
+                        <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 30"
+                        keyboardType="numeric" 
+                        onChangeText={setCosto}
+                        value={costo}
+                        />
+
+                    </View>
+            ) : null}
+                <View>
+                    <Text style={estiloRegistroCosto.label}>lista de materiales y su costo</Text>
+                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. pintura: 30 dolares"
+                
+                    onChangeText={setMateriales}
+                    value={materiales}
                     multiline={true}
-                    numberOfLines={4}/>
-               
-                    <Text style={estiloRegistroCosto.label}>telefono</Text>
-                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 04223451234"
-                    keyboardType="numeric" 
-                    onChangeText={setTelefono}
-                    value={telefono}
-                    />
-                
-                    <Text style={estiloRegistroCosto.label}>costo de contratarlo</Text>
-                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 30 dolares"
-                    keyboardType="numeric" 
-                    onChangeText={setCosto}
-                    value={costo}
+                    numberOfLines={4}
                     />
 
                 </View>
-           ) : null}
-            <View>
-                <Text style={estiloRegistroCosto.label}>lista de materiales y su costo</Text>
-                <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. pintura: 30 dolares"
-               
-                onChangeText={setMateriales}
-                value={materiales}
-                multiline={true}
-                numberOfLines={4}
-                />
+                <View>
+                    <Text style={estiloRegistroCosto.label}>Costo total</Text>
+                    <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 60"
+                    keyboardType="numeric" 
+                    onChangeText={setCostoFinal}
+                    value={costoFinal}
+                    />
+                </View>
+                <View>
+                    <Text style={estiloRegistroCosto.label}>Tipo de moneda usada</Text>
+                    <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={moneda}
+                    onValueChange={(item) => setMoneda(item)}
+                    >
+                        <Picker.Item label="Seleciona el tipo de moneda" value=""/>
+                        <Picker.Item label="Bolivares" value="Bolivares"/>
+                        <Picker.Item label="Dolares" value="Dolares"/>
+                        <Picker.Item label="Peso Colombiano" value="Peso Colombiano"/>
+                    </Picker>
+
+                </View>
+                
+                <TouchableOpacity style={[estiloRegistroCosto.btn,{ opacity: cargando ? 0.7 : 1 }]} onPress={presionarBotonGuardar} disabled={cargando}>
+                    <Text style={estiloRegistroCosto.btnText}>{item ? "Guardar Cambios" : "Registrar reporte"}</Text>
+                </TouchableOpacity>
+                
+            </View>
+
+
 
             </View>
-            <View>
-                <Text style={estiloRegistroCosto.label}>Costo total</Text>
-                <TextInput style={estiloRegistroCosto.inputText} placeholder="Ej. 60 dolares"
-                keyboardType="numeric" 
-                onChangeText={setCostoFinal}
-                value={costoFinal}
-                />
-            </View>
-            <View>
-                <Text style={estiloRegistroCosto.label}>Tipo de moneda usada</Text>
-                <Picker style={estiloRegistroCosto.contenedorPiker} selectedValue={moneda}
-                onValueChange={(item) => setMoneda(item)}
-                >
-                    <Picker.Item label="Seleciona el tipo de moneda" value=""/>
-                    <Picker.Item label="Bolivares" value="Bolivares"/>
-                    <Picker.Item label="Dolares" value="Dolares"/>
-                    <Picker.Item label="Peso Colombiano" value="Peso Colombiano"/>
-                </Picker>
-
-            </View>
-            
-            <TouchableOpacity style={[estiloRegistroCosto.btn,{ opacity: cargando ? 0.7 : 1 }]} onPress={presionarBotonGuardar} disabled={cargando}>
-                <Text style={estiloRegistroCosto.btnText}>{item ? "Guardar Cambios" : "Registrar reporte"}</Text>
-            </TouchableOpacity>
-            
-        </View>
-
-
-
-        </View>
-        </ScrollView>
+            </ScrollView>
+        </KeyboardAvoidingView>
         )
 };
