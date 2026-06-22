@@ -50,7 +50,7 @@ export default function Admin({ route, navigation }) {
 
                 {/* BOTÓN: PANEL DE USUARIOS (ACTIVOS) */}
                 <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#e74c3c' }]}
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#23ccd8' }]} 
                     onPress={() => navigation.navigate('PanelUsuarios')}
                     activeOpacity={0.7}
                 >
@@ -63,7 +63,7 @@ export default function Admin({ route, navigation }) {
 
                 {/* BOTÓN: USUARIOS INACTIVOS */}
                 <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#0b8891' }]} 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#e74c3c' }]} 
                     onPress={() => navigation.navigate('MostrarUsuariosInactivos')} 
                     activeOpacity={0.7}
                 >
@@ -89,7 +89,7 @@ export default function Admin({ route, navigation }) {
 
                 {/* BOTÓN: HISTORIAL DE ESTADOS DE BAÑOS */}
                 <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#d9f312' }]} 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#4d95f3' }]} 
                     onPress={() => navigation.navigate('EstadoBano', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >
@@ -102,7 +102,7 @@ export default function Admin({ route, navigation }) {
 
                 {/* BOTÓN: HISTORIAL DE ESTADOS DE HABITACIONES */}
                 <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#12f3c6' }]} 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#3730A3' }]} 
                     onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >
@@ -115,7 +115,7 @@ export default function Admin({ route, navigation }) {
 
                 {/* BOTÓN: REGISTROS DE COSTOS DE REPARACIÓN */}
                 <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#12f3c6' }]} 
+                    style={[styles.boton, { marginTop: 20, backgroundColor: '#115E59' }]} 
                     onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })} 
                     activeOpacity={0.7}
                 >

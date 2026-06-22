@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Text, StyleSheet, View, TouchableOpacity, FlatList, 
-    Alert, ActivityIndicator, RefreshControl, Modal,ScrollView 
+    Alert, ActivityIndicator, RefreshControl, Modal, ScrollView 
 } from 'react-native';
 import axios from 'axios';
 import { BASE_URL } from './apiConfig';
@@ -16,24 +16,33 @@ export default function CostoReparacion({ navigation, route }) {
     const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [itemSeleccionado, setItemSeleccionado] = useState(null);
-    
+    const [errorModalVisible, setErrorModalVisible] = useState(false);
+    const [errorMensaje, setErrorMensaje] = useState('');
 
     const detalles = (item) => {
-    setItemSeleccionado(item);
-    setModalVisible(true);
+        setItemSeleccionado(item);
+        setModalVisible(true);
     };
 
     const cargarDatos = useCallback(async () => {
         try {
             // 1. Obtener Historial
             const resCostos = await axios.get(`${API_URL}/listar-costo-reparacion`,  { timeout: 6000 });
-            if (resCostos.data.success) {
+            if (resCostos.data.success && Array.isArray(resCostos.data.habitacion)) {
                 setHabitaciones(resCostos.data.habitacion);
+                if (resCostos.data.habitacion.length === 0) {
+                    setErrorMensaje('No existe ningún registro de gastos aún. Agrega un costo para poder visualizar el historial.');
+                    setErrorModalVisible(true);
+                }
+            } else {
+                setHabitaciones([]);
+                setErrorMensaje(resCostos.data.mensaje || 'No se pudo cargar el historial de costos.');
+                setErrorModalVisible(true);
             }
-            
         } catch (error) {
             console.error('Error en Listar los costos extras:', error);
-            Alert.alert("Error de Red", "No se pudo conectar con el servidor. Verifica que esté encendido.");
+            setErrorMensaje('No se pudo conectar con el servidor. Verifica que esté encendido.');
+            setErrorModalVisible(true);
         } finally {
             setCargando(false);
             setRefreshing(false);
@@ -45,6 +54,7 @@ export default function CostoReparacion({ navigation, route }) {
             setCargando(true);
             cargarDatos();
         });
+
         return unsubscribe;
     }, [navigation, cargarDatos]);
     const botonEliminar = (idCosto) => {
@@ -131,6 +141,10 @@ export default function CostoReparacion({ navigation, route }) {
 
 
             <Text style={styles.tituloSeccion}>Informacion Costos extras</Text>
+            <View style={styles.cardReportePdf}>
+                <Text style={styles.subtituloCard}>Registro de Costos</Text>
+                <Text style={styles.label}>Aquí puedes ver los costos extras registrados y agregar nuevos elementos.</Text>
+            </View>
             <TouchableOpacity 
                             style={styles.botonNuevo} 
                             activeOpacity={0.7}
@@ -197,6 +211,25 @@ export default function CostoReparacion({ navigation, route }) {
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={errorModalVisible}
+                onRequestClose={() => setErrorModalVisible(false)}>
+                <View style={styles.modalCentrado}>
+                    <View style={styles.contenidoModal}>
+                        <Text style={styles.modalTitulo}>⚠️ Atención</Text>
+                        <Text style={[styles.detalleText, { marginTop: 10, textAlign: 'center', fontWeight: '600' }]}>{errorMensaje}</Text>
+                        <TouchableOpacity
+                            style={[styles.botonCerrarModal, { marginTop: 20 }]}
+                            onPress={() => setErrorModalVisible(false)}
+                        >
+                            <Text style={styles.textoBotonCerrar}>Cerrar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
         
     );
@@ -215,6 +248,9 @@ const styles = StyleSheet.create({
         marginBottom: 25 
     },
     textoBotonNuevo: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
+    subtituloCard: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 12 },
+    label: { fontSize: 13, color: '#475569', marginBottom: 8, fontWeight: '600' },
+    cardReportePdf: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, marginBottom: 22, borderWidth: 1, borderColor: '#E2E8F0' },
     tituloSeccion: { fontSize: 14, fontWeight: 'bold', color: '#94A3B8', marginBottom: 15, textTransform: 'uppercase' },
     card: { backgroundColor: '#FFF', borderRadius: 15, padding: 15, marginBottom: 12, elevation: 2 },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -63,7 +63,7 @@ export const estilosCalcularConsumo = StyleSheet.create({
         width: '100%',
         color: '#1e293b',
     },
-    // Estilo para inputs de resultados (si los tienes)
+    // Estilo para resultados mostrados en pantalla
     resultadoBox: {
         backgroundColor: '#EEF2FF',
         padding: 15,
