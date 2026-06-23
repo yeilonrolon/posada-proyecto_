@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { generatePdfBuffer } = require('../pdfService');
-const { sendEmail } = require('../emailService');
 
 const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -141,7 +140,37 @@ const buildTemplateData = async (report, params = {}) => {
         };
     }
 
-    throw new Error('Reporte no válido. Usa factura, historial, usuarios o costos.');
+    if (report === 'gastos') {
+        const query = `
+            SELECT c.tipo,
+                   c.lectura_valor,
+                   TO_CHAR(c.fecha_registro, 'DD/MM/YYYY HH12:MI AM') AS fecha_lista,
+                   u.nombre
+            FROM consumos_recursos c
+            LEFT JOIN usuarios u ON c.registrado_por = u.id
+            ORDER BY c.fecha_registro DESC
+            LIMIT 100`;
+
+        const resultado = await pool.query(query);
+        if (resultado.rows.length === 0) {
+            throw new Error('No hay registros de gastos para generar el PDF.');
+        }
+
+        return {
+            gastos: resultado.rows.map(row => ({
+                tipo: row.tipo,
+                lectura_valor: row.lectura_valor,
+                unidad: row.tipo === 'Agua' ? 'M3' : 'KWH',
+                fecha_lista: row.fecha_lista,
+                registrado_por: row.nombre || 'Desconocido'
+            })),
+            fechaGenerado: new Date().toLocaleDateString('es-VE'),
+            titulo: 'Reporte de Registros de Gastos',
+            totalRegistros: resultado.rows.length
+        };
+    }
+
+    throw new Error('Reporte no válido. Usa factura, historial, usuarios, costos o gastos.');
 };
 
 router.get('/generate', async (req, res) => {
@@ -171,20 +200,7 @@ router.post('/send', async (req, res) => {
         const templateData = await buildTemplateData(report.toLowerCase(), req.body);
         const pdfBuffer = await generatePdfBuffer(report.toLowerCase(), templateData);
 
-        await sendEmail({
-            to,
-            subject: subject || `Reporte PDF - ${report}`,
-            text: message || 'Adjunto envío de reporte en PDF.',
-            attachments: [
-                {
-                    filename: `${report}.pdf`,
-                    content: pdfBuffer,
-                    contentType: 'application/pdf'
-                }
-            ]
-        });
-
-        res.json({ success: true, mensaje: 'Correo enviado con el PDF adjunto.' });
+        res.json({ success: true, mensaje: 'PDF generado correctamente.' });
     } catch (error) {
         console.error('Error en /pdf/send:', error);
         const statusCode = error.message.includes('faltantes') || error.message.includes('no válido') ? 400 : 500;

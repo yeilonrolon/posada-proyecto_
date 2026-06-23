@@ -4,6 +4,8 @@ import {
     Alert, ActivityIndicator, RefreshControl 
 } from 'react-native';
 import axios from 'axios';
+import * as Print from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 import { BASE_URL } from './apiConfig';
 
 export default function Mantenimiento({ navigation, route }) {
@@ -14,6 +16,7 @@ export default function Mantenimiento({ navigation, route }) {
     const [gastos, setGastos] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [generandoPdf, setGenerandoPdf] = useState(false);
 
     // Alerta de mantenimiento preventivo (cada 30 días)
     const verificarAntiguedad = useCallback((datosServidor) => {
@@ -75,6 +78,71 @@ export default function Mantenimiento({ navigation, route }) {
         return unsubscribe;
     }, [navigation, cargarDatos]);
 
+    const generarPdfGastos = async () => {
+        if (gastos.length === 0) {
+            return Alert.alert('Sin registros', 'No hay registros de gastos para generar el PDF.');
+        }
+
+        setGenerandoPdf(true);
+        try {
+            const filas = gastos.map((item, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.tipo || ''}</td>
+                    <td>${item.lectura_valor || ''} ${item.tipo === 'Agua' ? 'M3' : 'KWH'}</td>
+                    <td>${item.fecha_lista || ''}</td>
+                    <td>${item.nombre || ''}</td>
+                </tr>
+            `).join('');
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Reporte de Gastos</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+                        h1 { font-size: 24px; margin-bottom: 8px; color: #1f2937; }
+                        p { margin: 4px 0; color: #475569; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+                        th, td { border: 1px solid #cbd5e1; padding: 10px 8px; text-align: left; font-size: 12px; }
+                        th { background: #f8fafc; color: #0f172a; }
+                        tbody tr:nth-child(even) { background: #f8fafc; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Reporte de Registros de Gastos</h1>
+                    <p>Generado: ${new Date().toLocaleDateString('es-VE')}</p>
+                    <p>Total de registros: ${gastos.length}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Tipo</th>
+                                <th>Lectura</th>
+                                <th>Fecha</th>
+                                <th>Registrado por</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filas}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const { uri } = await Print.printToFileAsync({ html });
+            await shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Compartir reporte de gastos' });
+        } catch (error) {
+            console.error('Error generando PDF:', error);
+            Alert.alert('Error', 'No se pudo generar el PDF. Intenta de nuevo.');
+        } finally {
+            setGenerandoPdf(false);
+        }
+    };
+
     const renderGasto = ({ item }) => (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -103,6 +171,15 @@ export default function Mantenimiento({ navigation, route }) {
                 onPress={() => navigation.navigate('CrearLuzAgua', { idUsuario, nombreUsuario })}
             >
                 <Text style={styles.textoBotonNuevo}>➕ NUEVA LECTURA</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.botonNuevo, styles.botonPdf]}
+                activeOpacity={0.7}
+                onPress={generarPdfGastos}
+                disabled={generandoPdf}
+            >
+                <Text style={styles.textoBotonNuevo}>{generandoPdf ? 'Generando PDF...' : '📄 GENERAR PDF'}</Text>
             </TouchableOpacity>
 
             <Text style={styles.tituloSeccion}>Historial de Consumo</Text>
@@ -139,6 +216,7 @@ const styles = StyleSheet.create({
         marginBottom: 25 
     },
     textoBotonNuevo: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
+    botonPdf: { backgroundColor: '#10B981' },
     
     tituloSeccion: { fontSize: 14, fontWeight: 'bold', color: '#94A3B8', marginBottom: 15, textTransform: 'uppercase' },
     card: { backgroundColor: '#FFF', borderRadius: 15, padding: 15, marginBottom: 12, elevation: 2 },

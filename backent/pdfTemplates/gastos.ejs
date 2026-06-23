@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title><%= titulo %></title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #1f2937; }
+        h1 { font-size: 26px; margin-bottom: 8px; color: #111827; }
+        p { margin: 4px 0 10px 0; color: #4b5563; }
+        table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+        th, td { border: 1px solid #d1d5db; padding: 10px 8px; text-align: left; font-size: 12px; }
+        th { background: #f3f4f6; color: #111827; }
+        tbody tr:nth-child(even) { background: #f9fafb; }
+        .header-row { margin-bottom: 30px; }
+        .label { color: #6b7280; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <h1><%= titulo %></h1>
+    <p class="label">Fecha de generación: <%= fechaGenerado %></p>
+    <p class="label">Total de registros: <%= totalRegistros %></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Tipo</th>
+                <th>Lectura</th>
+                <th>Fecha</th>
+                <th>Registrado por</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% gastos.forEach((gasto, index) => { %>
+                <tr>
+                    <td><%= index + 1 %></td>
+                    <td><%= gasto.tipo %></td>
+                    <td><%= gasto.lectura_valor %> <%= gasto.unidad %></td>
+                    <td><%= gasto.fecha_lista %></td>
+                    <td><%= gasto.registrado_por %></td>
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+</body>
+</html>

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
+import * as Print from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 import { estilosCalcularConsumo as styles } from '../styles/EstilosCalcularConsumo';
 import { BASE_URL } from './apiConfig';
 /**
@@ -24,6 +26,7 @@ export default function CalcularConsumo() {
     const [errorModalVisible, setErrorModalVisible] = useState(false);
     const [errorModalMensaje, setErrorModalMensaje] = useState('');
     const [reportMode, setReportMode] = useState('Mes'); // 'Individual' | 'Mes' | 'Rango'
+    const [generandoPdf, setGenerandoPdf] = useState(false);
     const [desdeMes, setDesdeMes] = useState(1);
     const [desdeAnio, setDesdeAnio] = useState(anioActual);
 
@@ -37,6 +40,126 @@ export default function CalcularConsumo() {
     const mostrarError = (mensaje) => {
         setErrorModalMensaje(mensaje);
         setErrorModalVisible(true);
+    };
+
+    const generarPdfConsumo = async () => {
+        if (!resultado) {
+            return Alert.alert('Generar PDF', 'Primero genera el reporte de consumo.');
+        }
+
+        setGenerandoPdf(true);
+        try {
+            const titulo = `Reporte de Consumo - ${resultado.tipo}`;
+            const fecha = new Date().toLocaleDateString('es-VE');
+            const rows = [];
+
+            if (resultado.type === 'Individual') {
+                rows.push({ label: 'Último valor', value: `${resultado.ultimoValor}` });
+            } else if (resultado.type === 'Mes') {
+                rows.push({ label: 'Mes', value: `${meses[resultado.mes - 1].label} ${resultado.anio}` });
+                rows.push({ label: 'Lectura inicial', value: `${resultado.lectura_inicial} ${resultado.unidad}` });
+                rows.push({ label: 'Lectura final', value: `${resultado.lectura_final} ${resultado.unidad}` });
+                rows.push({ label: 'Consumo total', value: `${resultado.consumo} ${resultado.unidad}` });
+            } else if (resultado.type === 'Rango') {
+                rows.push({ label: 'Desde', value: `${meses[resultado.desde.mes - 1].label} ${resultado.desde.anio}` });
+                rows.push({ label: 'Hasta', value: `${meses[resultado.hasta.mes - 1].label} ${resultado.hasta.anio}` });
+                rows.push({ label: 'Lectura inicial', value: `${resultado.lectura_inicial} ${resultado.unidad}` });
+                rows.push({ label: 'Lectura final', value: `${resultado.lectura_final} ${resultado.unidad}` });
+                rows.push({ label: 'Consumo total', value: `${resultado.consumo} ${resultado.unidad}` });
+            }
+
+            const rowsHtml = rows.map(row => `
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: 600; background: #f8fafc;">${row.label}</td>
+                    <td style="padding: 10px; border: 1px solid #d1d5db;">${row.value}</td>
+                </tr>`).join('');
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>${titulo}</title>
+                    <style>
+                        :root {
+                            --bg: #f8fafc;
+                            --surface: #ffffff;
+                            --border: #e2e8f0;
+                            --text: #0f172a;
+                            --muted: #475569;
+                            --primary: #283593;
+                            --accent: #4f46e5;
+                        }
+                        * { box-sizing: border-box; }
+                        body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+                        .page { max-width: 820px; margin: 0 auto; padding: 24px; }
+                        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 28px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08); }
+                        header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 28px; }
+                        .brand strong { display: block; font-size: 24px; color: var(--primary); letter-spacing: 0.01em; }
+                        .brand span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; }
+                        .badge { padding: 10px 16px; background: var(--accent); color: white; border-radius: 999px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+                        .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+                        .info-block { background: #eef2ff; border-radius: 18px; padding: 18px; }
+                        .info-block strong { display: block; color: var(--primary); margin-bottom: 6px; font-size: 13px; }
+                        .info-block span { color: var(--text); font-size: 15px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                        th, td { padding: 14px 16px; border: 1px solid var(--border); }
+                        th { background: #eef2ff; color: var(--primary); font-weight: 700; text-align: left; }
+                        tbody tr:nth-child(even) { background: #f8fafc; }
+                        .footer { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="page">
+                        <div class="card">
+                            <header>
+                                <div class="brand">
+                                    <strong>Posada Villa Montaña C.A.</strong>
+                                    <span>Reporte de consumo del recurso</span>
+                                </div>
+                                <div class="badge">${resultado.tipo}</div>
+                            </header>
+
+                            <div class="info-grid">
+                                <div class="info-block">
+                                    <strong>Fecha de generación</strong>
+                                    <span>${fecha}</span>
+                                </div>
+                                <div class="info-block">
+                                    <strong>Tipo de reporte</strong>
+                                    <span>${resultado.type === 'Mes' ? 'Mensual' : resultado.type === 'Rango' ? 'Acumulado' : 'Último valor'}</span>
+                                </div>
+                            </div>
+
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th>Detalle</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+
+                            <div class="footer">
+                                Posada Villa Montaña C.A. · Sistema de mantenimiento y consumo
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const { uri } = await Print.printToFileAsync({ html });
+            await shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Compartir reporte de consumo' });
+        } catch (error) {
+            console.error('Error generando PDF:', error);
+            Alert.alert('Error', 'No se pudo generar el PDF. Intenta de nuevo.');
+        } finally {
+            setGenerandoPdf(false);
+        }
     };
 
     const ejecutarCalculo = async () => {
@@ -306,6 +429,19 @@ export default function CalcularConsumo() {
                                     </View>
                                 </>
                             )}
+
+                            <TouchableOpacity
+                                onPress={generarPdfConsumo}
+                                style={[styles.btn, { backgroundColor: '#10B981', marginTop: 10, opacity: generandoPdf ? 0.7 : 1 }]}
+                                disabled={generandoPdf}
+                                activeOpacity={0.8}
+                            >
+                                {generandoPdf ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.btnText}>GENERAR PDF</Text>
+                                )}
+                            </TouchableOpacity>
 
                             <Pressable
                                 onPress={() => setModalVisible(false)}
