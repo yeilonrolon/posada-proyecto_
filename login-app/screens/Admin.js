@@ -1,13 +1,28 @@
 import React from 'react';
 import { Text, StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+// Importamos FontAwesome y MaterialCommunityIcons para tener íconos profesionales
+import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+
 /**
- * PANTALLA: PANEL ADMINISTRATIVO
- * Función: Menú principal con acceso a todas las gestiones del sistema.
+ * PANTALLA: PANEL ADMINISTRATIVO (Diseño Profesional)
  */
 export default function Admin({ route, navigation }) {
     // Extraemos las credenciales y el rol que vienen desde el Login
     const { idUsuario, nombreUsuario, rol } = route.params || {};
+
+    // Helper para renderizar cada botón de manera limpia, ordenada y con un chevron a la derecha
+    const RenderBotonAdmin = ({ titulo, subtitulo, icono, libreria: LibreriaIcono, colorAcento, onPress }) => (
+        <TouchableOpacity style={styles.tarjetaBoton} onPress={onPress} activeOpacity={0.7}>
+            <View style={[styles.contenedorIcono, { backgroundColor: `${colorAcento}15` }]}>
+                <LibreriaIcono name={icono} size={22} color={colorAcento} />
+            </View>
+            <View style={styles.bloqueTexto}>
+                <Text style={styles.textoPrincipal} numberOfLines={1}>{titulo}</Text>
+                <Text style={styles.textoSecundario} numberOfLines={1}>{subtitulo}</Text>
+            </View>
+            <FontAwesome name="chevron-right" size={12} color="#b0bec5" style={styles.flechaDerecha} />
+        </TouchableOpacity>
+    );
 
     return (
         <SafeAreaView style={styles.contenedor}>
@@ -19,130 +34,98 @@ export default function Admin({ route, navigation }) {
                     <Text style={styles.subtitulo}>
                         Bienvenido, <Text style={styles.nombreResaltado}>{nombreUsuario || 'Usuario'}</Text>
                     </Text>
-                    <Text style={styles.fechaTexto}>Última sesión vista activa: {new Date().toLocaleDateString()}</Text>
+                    <Text style={styles.fechaTexto}>Última sesión activa: {new Date().toLocaleDateString()}</Text>
                 </View>
 
-                {/* BOTÓN: REGISTRAR SERVICIOS (LUZ Y AGUA) */}
-                <TouchableOpacity 
-                    style={styles.boton} 
+                {/* SECCIÓN: OPERACIONES CENTRALES */}
+                <Text style={styles.seccionTitulo}>Operaciones Principales</Text>
+
+                <RenderBotonAdmin 
+                    titulo="Registrar Servicios"
+                    subtitulo="Lecturas de Luz y Agua"
+                    icono="flash"
+                    libreria={MaterialCommunityIcons}
+                    colorAcento="#3b82f6" // Azul moderno
                     onPress={() => navigation.navigate('CrearLuzAgua', { idUsuario, nombreUsuario, rol })}
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>⚡</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Registrar Servicios</Text>
-                        <Text style={styles.textoSecundario}>Lecturas de Luz y Agua</Text>
-                    </View>
-                </TouchableOpacity>
+                />
 
-                {/* BOTÓN: NUEVO OPERADOR */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#2ecc71' }]} 
+                <RenderBotonAdmin 
+                    titulo="Gestión de Equipos y QR"
+                    subtitulo="Inventario, Etiquetas e Inspección"
+                    icono="qrcode"
+                    libreria={FontAwesome}
+                    colorAcento="#8b5cf6" // Morado tecnológico
+                    onPress={() => navigation.navigate('qr', { idUsuario, nombreUsuario, rol })}
+                />
+
+                <RenderBotonAdmin 
+                    titulo="Costos de Reparación"
+                    subtitulo="Auditoría de Costos de Reparación"
+                    icono="currency-usd"
+                    libreria={MaterialCommunityIcons}
+                    colorAcento="#10b981" // Verde esmeralda
+                    onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })}
+                />
+
+                {/* SECCIÓN: INFRAESTRUCTURA (HABITACIONES Y BAÑOS) */}
+                <Text style={styles.seccionTitulo}>Monitoreo de Planta</Text>
+
+                <RenderBotonAdmin 
+                    titulo="Estados de Habitaciones"
+                    subtitulo="Auditoría de Estados de Habitaciones"
+                    icono="bed"
+                    libreria={FontAwesome}
+                    colorAcento="#6366f1" // Índigo
+                    onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })}
+                />
+
+                <RenderBotonAdmin 
+                    titulo="Estados de Baños"
+                    subtitulo="Auditoría de Estados de Baños"
+                    icono="toilet"
+                    libreria={MaterialCommunityIcons}
+                    colorAcento="#06b6d4" // Cian
+                    onPress={() => navigation.navigate('EstadoBano', { idUsuario, nombreUsuario, rol })}
+                />
+
+                {/* SECCIÓN: CONTROL DE PERSONAL Y SEGURIDAD */}
+                <Text style={styles.seccionTitulo}>Personal y Seguridad</Text>
+
+                <RenderBotonAdmin 
+                    titulo="Nuevo Operador"
+                    subtitulo="Registrar personal nuevo"
+                    icono="user-plus"
+                    libreria={FontAwesome}
+                    colorAcento="#f59e0b" // Ámbar corporativo
                     onPress={() => navigation.navigate('Registro')}
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>👤</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Nuevo Operador</Text>
-                        <Text style={styles.textoSecundario}>Registrar personal nuevo</Text>
-                    </View>
-                </TouchableOpacity>
+                />
 
-                {/* BOTÓN: PANEL DE USUARIOS (ACTIVOS) */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#23ccd8' }]} 
+                <RenderBotonAdmin 
+                    titulo="Panel de Usuarios"
+                    subtitulo="Editar y gestionar activos"
+                    icono="users"
+                    libreria={FontAwesome}
+                    colorAcento="#4b5563" // Gris oscuro slate
                     onPress={() => navigation.navigate('PanelUsuarios')}
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>👥</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Panel de Usuarios</Text>
-                        <Text style={styles.textoSecundario}>Editar y gestionar activos</Text>
-                    </View>
-                </TouchableOpacity>
+                />
 
-                {/* BOTÓN: USUARIOS INACTIVOS */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#e74c3c' }]} 
-                    onPress={() => navigation.navigate('MostrarUsuariosInactivos')} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>🚫</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Usuarios Inactivos</Text>
-                        <Text style={styles.textoSecundario}>Personal dado de baja</Text>
-                    </View>
-                </TouchableOpacity>
+                <RenderBotonAdmin 
+                    titulo="Usuarios Inactivos"
+                    subtitulo="Personal dado de baja"
+                    icono="user-times"
+                    libreria={FontAwesome}
+                    colorAcento="#ef4444" // Rojo sutil
+                    onPress={() => navigation.navigate('MostrarUsuariosInactivos')}
+                />
 
-                {/* BOTÓN: HISTORIAL DE ACCESOS (AUDITORÍA) */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#f39c12' }]} 
-                    onPress={() => navigation.navigate('HistorialAccesos')} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>🕒</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Historial de Accesos</Text>
-                        <Text style={styles.textoSecundario}>Auditoría de ingresos</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* BOTÓN: HISTORIAL DE ESTADOS DE BAÑOS */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#4d95f3' }]} 
-                    onPress={() => navigation.navigate('EstadoBano', { idUsuario, nombreUsuario, rol })} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>🚽</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Registro de Estados de Baños</Text>
-                        <Text style={styles.textoSecundario}>Auditoría de Estados de Baños</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* BOTÓN: HISTORIAL DE ESTADOS DE HABITACIONES */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#3730A3' }]} 
-                    onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>🛏️</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Historial de Estados de Habitaciones</Text>
-                        <Text style={styles.textoSecundario}>Auditoría de Estados de Habitaciones</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* BOTÓN: REGISTROS DE COSTOS DE REPARACIÓN */}
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#115E59' }]} 
-                    onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })} 
-                    activeOpacity={0.7}
-                >
-                    <View style={styles.circuloIcono}><Text style={styles.icono}>💵</Text></View>
-                    <View>
-                        <Text style={styles.textoBoton}>Registros de Costos de Reparación</Text>
-                        <Text style={styles.textoSecundario}>Auditoría de Costos de Reparación</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* AGREGADO - BOTÓN: CONTROL DE ACTIVOS Y CÓDIGOS QR */}
-
-                <TouchableOpacity 
-                    style={[styles.boton, { marginTop: 20, backgroundColor: '#8e44ad' }]} 
-                    onPress={() => navigation.navigate('qr', { idUsuario, nombreUsuario, rol })} 
-                    activeOpacity={0.7}
-                >
-                    {/* Cambiamos el Text por el componente de Icono FontAwesome */}
-                    <View style={styles.circuloIcono}>
-                        <FontAwesome name="qrcode" size={24} color="white" />
-                    </View>
-                    
-                    <View>
-                        <Text style={styles.textoBoton}>Gestión de Equipos y QR</Text>
-                        <Text style={styles.textoSecundario}>Inventario, Etiquetas e Inspección</Text>
-                    </View>
-                </TouchableOpacity>
+                <RenderBotonAdmin 
+                    titulo="Historial de Accesos"
+                    subtitulo="Auditoría de ingresos al sistema"
+                    icono="history"
+                    libreria={MaterialCommunityIcons}
+                    colorAcento="#6b7280"
+                    onPress={() => navigation.navigate('HistorialAccesos')}
+                />
 
             </ScrollView>
 
@@ -154,73 +137,92 @@ export default function Admin({ route, navigation }) {
 const styles = StyleSheet.create({
     contenedor: { 
         flex: 1, 
-        backgroundColor: '#f8f9fa', 
+        backgroundColor: '#f1f5f9', // Un fondo gris azulado claro muy elegante (Slate 100)
     },
     scrollContent: {
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingTop: 20,
         paddingBottom: 40 
     },
     header: { 
-        marginBottom: 30,
+        marginBottom: 20,
         marginTop: 10 
     },
     titulo: { 
-        fontSize: 26, 
-        fontWeight: 'bold', 
-        color: '#2c3e50', 
+        fontSize: 24, 
+        fontWeight: '800', 
+        color: '#0f172a', // Casi negro para alta legibilidad
+        letterSpacing: -0.5,
     },
     subtitulo: { 
-        fontSize: 16, 
-        color: '#7f8c8d',
-        marginTop: 5
+        fontSize: 15, 
+        color: '#64748b',
+        marginTop: 4
     },
     nombreResaltado: {
         fontWeight: 'bold',
-        color: '#525FE1'
+        color: '#3b82f6'
     },
     fechaTexto: {
-        fontSize: 13,
-        color: '#bdc3c7',
-        marginTop: 2
+        fontSize: 12,
+        color: '#94a3b8',
+        marginTop: 4
     },
-    boton: { 
-        backgroundColor: '#525FE1', 
-        padding: 18, 
-        borderRadius: 20, 
+    seccionTitulo: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#475569',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginTop: 22,
+        marginBottom: 10,
+    },
+    /* === EL CAMBIO PRINCIPAL: LAS TARJETAS DE LOS BOTONES === */
+    tarjetaBoton: { 
+        backgroundColor: '#ffffff', 
+        paddingVertical: 14, 
+        paddingHorizontal: 16,
+        borderRadius: 16, 
         flexDirection: 'row', 
         alignItems: 'center', 
-        elevation: 4, 
-        shadowColor: '#000', 
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        marginBottom: 10,
+        // Sombras suaves de estilo minimalista
+        elevation: 2, 
+        shadowColor: '#0f172a', 
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
     },
-    circuloIcono: {
-        width: 46,
-        height: 46,
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-        borderRadius: 23,
+    contenedorIcono: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 15
     },
-    icono: { 
-        fontSize: 22 
+    bloqueTexto: {
+        flex: 1,
+        marginLeft: 14,
+        paddingRight: 10,
     },
-    textoBoton: { 
-        color: 'white', 
-        fontSize: 17, 
-        fontWeight: 'bold' 
+    textoPrincipal: { 
+        color: '#1e293b', 
+        fontSize: 15, 
+        fontWeight: '600',
     },
     textoSecundario: {
-        color: 'rgba(255, 255, 255, 0.9)',
-        fontSize: 13
+        color: '#64748b',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    flechaDerecha: {
+        marginLeft: 'auto',
     },
     footerText: {
         alignSelf: 'center',
-        color: '#bdc3c7',
+        color: '#94a3b8',
         fontSize: 11,
-        marginBottom: 10,
-        fontWeight: '500'
+        marginBottom: 12,
+        fontWeight: '600'
     }
 });
