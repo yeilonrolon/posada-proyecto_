@@ -103,24 +103,30 @@ router.put('/:id/revision', async (req, res) => {
 });
 
 // ===================================================
-// ENDPOINT 4: EDITAR DATOS GENERALES COMPLETO (UPDATE)
+// ENDPOINT 4: EDITAR DATOS GENERALES COMPLETO (UPDATE) - CORREGIDO
 // ===================================================
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { nombre_equipo, ubicacion, frecuencia_mantenimiento,registrado_por  } = req.body;
+    const { nombre_equipo, ubicacion, frecuencia_mantenimiento, registrado_por } = req.body;
 
     try {
         const queryText = `
             UPDATE equipos_qr 
-            SET nombre_equipo = $1, ubicacion = $2, frecuencia_mantenimiento = $3, revisado_por = $4
+            SET nombre_equipo = $1, 
+                ubicacion = $2, 
+                frecuencia_mantenimiento = $3, 
+                revisado_por = $4
             WHERE id = $5
             RETURNING *;
         `;
+        
+        // CORRECCIÓN: Pasamos los 5 parámetros en el orden exacto que requiere el SQL
         const resultado = await pool.query(queryText, [
-            nombre_equipo, 
-            ubicacion, 
+            nombre_equipo ? nombre_equipo.trim() : '', 
+            ubicacion ? ubicacion.trim() : '', 
             parseInt(frecuencia_mantenimiento, 10) || 90, 
-            parseInt(id, 10)
+            registrado_por ? parseInt(registrado_por, 10) : null, // $4 mapped a revisado_por
+            parseInt(id, 10)                                      // $5 mapped a WHERE id
         ]);
 
         if (resultado.rows.length === 0) {
