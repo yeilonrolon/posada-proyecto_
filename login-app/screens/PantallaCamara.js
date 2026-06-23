@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, Button, TouchableOpacity, Alert, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-
-// CORREGIDO: Importación con llaves { } para evitar que BASE_URL llegue undefined
+import { useIsFocused } from '@react-navigation/native'; 
 import { BASE_URL } from './apiConfig';
 
+/**
+ * PANTALLA: ESCÁNER DE CÓDIGOS QR
+ * Función: Identifica equipos de la posada por QR y asienta la fecha de revisión técnica.
+ */
 export default function PantallaCamara({ navigation }) {
     const [permission, requestPermission] = useCameraPermissions();
     const [escaneado, setEscaneado] = useState(false);
+    const isFocused = useIsFocused(); 
 
     // Estados de control
     const [modalVisible, setModalVisible] = useState(false);
@@ -15,10 +19,8 @@ export default function PantallaCamara({ navigation }) {
     const [buscandoBD, setBuscandoBD] = useState(false);
     const [guardando, setGuardando] = useState(false);
 
-    // Endpoint base unificado
     const API_URL = `${BASE_URL}/api/equipos`;
 
-    // Genera la fecha de hoy automáticamente en formato "YYYY-MM-DD"
     const obtenerFechaHoyString = () => {
         const hoy = new Date();
         const año = hoy.getFullYear();
@@ -31,15 +33,21 @@ export default function PantallaCamara({ navigation }) {
         if (!permission) { requestPermission(); }
     }, [permission]);
 
+    const cerrarModalYReintentar = useCallback(() => {
+        setModalVisible(false);
+        setDatosEquipo(null);
+        setEscaneado(false);
+    }, []);
+
     if (!permission) {
-        return <View style={styles.containerCentrado}><ActivityIndicator size="large" color="#1a365d" /></View>;
+        return <View style={styles.containerCentrado}><ActivityIndicator size="large" color="#525FE1" /></View>;
     }
 
     if (!permission.granted) {
         return (
             <View style={styles.containerCentrado}>
-                <Text style={{ textAlign: 'center', marginBottom: 15, color: '#475569' }}>Necesitamos tu permiso para usar la cámara.</Text>
-                <Button onPress={requestPermission} title="Conceder Permiso" color="#1a365d" />
+                <Text style={styles.txtPermiso}>Necesitamos tu permiso para usar la cámara y escanear los equipos.</Text>
+                <Button onPress={requestPermission} title="Conceder Permiso" color="#525FE1" />
             </View>
         );
     }
@@ -53,34 +61,29 @@ export default function PantallaCamara({ navigation }) {
             const idEquipo = objetoQR.id || objetoQR.id_simulado;
             
             if (!idEquipo) {
-                Alert.alert('QR Inválido', 'Código no reconocido.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
+                Alert.alert('QR Inválido', 'El formato del código no es reconocido por el sistema.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
                 return;
             }
 
             setBuscandoBD(true);
-            const respuesta = await fetch(`${API_URL}`);
+            
+            // OPTIMIZACIÓN: Se consulta directamente el endpoint por ID en lugar de traer todo el array completo
+            const respuesta = await fetch(`${API_URL}/${idEquipo}`, { timeout: 5000 });
             const resultadoJSON = await respuesta.json();
             
             setBuscandoBD(false);
 
-            // CORREGIDO: Accedemos al arreglo real de filas que viaja en la propiedad '.datos'
-            if (respuesta.ok && resultadoJSON.success && Array.isArray(resultadoJSON.datos)) {
-                const equipoReal = resultadoJSON.datos.find(e => e.id === parseInt(idEquipo, 10));
-
-                if (equipoReal) {
-                    setDatosEquipo(equipoReal);
-                    setModalVisible(true);
-                } else {
-                    Alert.alert('No encontrado', 'El equipo no existe en el sistema de la Posada.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
-                }
+            if (respuesta.ok && resultadoJSON.success && resultadoJSON.datos) {
+                setDatosEquipo(resultadoJSON.datos);
+                setModalVisible(true);
             } else {
-                Alert.alert('Error de Servidor', 'Estructura de datos inesperada desde el Backend.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
+                Alert.alert('No encontrado', 'El activo no se encuentra registrado en el sistema.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
             }
 
         } catch (e) {
             setBuscandoBD(false);
             console.error('Error procesando QR:', e);
-            Alert.alert('Error', 'No se pudo procesar el código o decodificar el formato JSON.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
+            Alert.alert('Error', 'No se pudo leer el código. Asegúrese de que sea un QR válido de la Posada.', [{ text: 'Ok', onPress: () => setEscaneado(false) }]);
         }
     };
 
@@ -113,28 +116,28 @@ export default function PantallaCamara({ navigation }) {
 
         Alert.alert(
             'Confirmar Registro 📋',
-            `¿Está seguro de realizar el cambio de fecha de revisión o mantenimiento para el día de hoy (${fechaHoy})?`,
+            `¿Está seguro de actualizar la última fecha de revisión para el día de hoy (${fechaHoy})?`,
             [
                 { text: 'Cancelar', style: 'cancel' },
-                { text: 'Sí, guardar', onPress: () => ejecutarGuardadoEnBD(fechaHoy), style: 'default' }
+                { text: 'Sí, guardar', onPress: () => ejecutarGuardadoEnBD(fechaHoy) }
             ],
             { cancelable: true }
         );
     };
 
-    const cerrarModalYReintentar = () => {
-        setModalVisible(false);
-        setDatosEquipo(null);
-        setEscaneado(false);
-    };
-
     return (
         <View style={styles.container}>
-            <CameraView
-                style={StyleSheet.absoluteFillObject}
-                onBarcodeScanned={escaneado ? undefined : manejarEscaneoQr}
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            />
+            {isFocused ? (
+                <CameraView
+                    style={StyleSheet.absoluteFillObject}
+                    onBarcodeScanned={escaneado ? undefined : manejarEscaneoQr}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                />
+            ) : (
+                <View style={styles.containerCentrado}>
+                    <ActivityIndicator size="large" color="#525FE1" />
+                </View>
+            )}
             
             <View style={styles.overlay}>
                 <Text style={styles.textoGuia}>Apunta la cámara al código QR del equipo</Text>
@@ -143,7 +146,7 @@ export default function PantallaCamara({ navigation }) {
                 {buscandoBD && (
                     <View style={styles.cajaCargandoBD}>
                         <ActivityIndicator size="small" color="#fff" />
-                        <Text style={styles.txtCargandoBD}>Consultando PostgreSQL...</Text>
+                        <Text style={styles.txtCargandoBD}>Consultando base de datos...</Text>
                     </View>
                 )}
             </View>
@@ -157,23 +160,23 @@ export default function PantallaCamara({ navigation }) {
                 >
                     <View style={styles.fondoModal}>
                         <View style={styles.contenidoModal}>
-                            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center' }}>
+                            <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                                 
                                 <Text style={styles.modalTitulo}>📋 Información del Activo</Text>
                                 
                                 <View style={styles.cajaDatosBloqueados}>
-                                    <Text style={styles.textoDetalle}><Text style={styles.negrita}>ID:</Text> #{datosEquipo.id}</Text>
-                                    <Text style={styles.textoDetalle}><Text style={styles.negrita}>Equipo:</Text> {datosEquipo.nombre_equipo}</Text>
+                                    <Text style={styles.textoDetalle}><Text style={styles.negrita}>ID Equipo:</Text> #{datosEquipo.id}</Text>
+                                    <Text style={styles.textoDetalle}><Text style={styles.negrita}>Nombre:</Text> {datosEquipo.nombre_equipo}</Text>
                                     <Text style={styles.textoDetalle}><Text style={styles.negrita}>Ubicación:</Text> 📍 {datosEquipo.ubicacion}</Text>
                                     <Text style={styles.textoDetalle}>
-                                        <Text style={styles.negrita}>Última Revisión Registrada:</Text> {datosEquipo.ultima_revision ? datosEquipo.ultima_revision.substring(0,10) : 'Ninguna'}
+                                        <Text style={styles.negrita}>Última Revisión:</Text> {datosEquipo.ultima_revision ? datosEquipo.ultima_revision.substring(0, 10) : 'Ninguna registrada'}
                                     </Text>
                                 </View>
 
                                 <View style={styles.divisor} />
 
                                 <View style={styles.cajaFechaAutomatica}>
-                                    <Text style={styles.labelInformativo}>📅 Fecha que se registrará hoy:</Text>
+                                    <Text style={styles.labelInformativo}>📅 Fecha de asentamiento:</Text>
                                     <Text style={styles.textoFechaHoy}>{obtenerFechaHoyString()}</Text>
                                 </View>
 
@@ -181,11 +184,12 @@ export default function PantallaCamara({ navigation }) {
                                     style={[styles.botonAccion, { backgroundColor: '#10b981', marginTop: 20 }]} 
                                     onPress={presionarBotonGuardar}
                                     disabled={guardando}
+                                    activeOpacity={0.8}
                                 >
                                     {guardando ? (
                                         <ActivityIndicator color="#fff" />
                                     ) : (
-                                        <Text style={styles.textoBotonAccion}>🔄 Actualizar Última Revisión</Text>
+                                        <Text style={styles.textoBotonAccion}>🔄 Guardar Revisión</Text>
                                     )}
                                 </TouchableOpacity>
 
@@ -193,6 +197,7 @@ export default function PantallaCamara({ navigation }) {
                                     style={[styles.botonAccion, { backgroundColor: '#ef4444', marginTop: 10 }]} 
                                     onPress={cerrarModalYReintentar}
                                     disabled={guardando}
+                                    activeOpacity={0.8}
                                 >
                                     <Text style={styles.textoBotonAccion}>Cancelar</Text>
                                 </TouchableOpacity>
@@ -209,24 +214,26 @@ export default function PantallaCamara({ navigation }) {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     containerCentrado: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc', padding: 20 },
-    overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
-    textoGuia: { color: '#fff', fontSize: 15, backgroundColor: 'rgba(26, 54, 93, 0.85)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginBottom: 20, fontWeight: '500' },
-    cuadroEnfoque: { width: 200, height: 200, borderWidth: 3, borderColor: '#0284c7', borderRadius: 12, marginBottom: 15 },
-    cajaCargandoBD: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', padding: 10, borderRadius: 8 },
-    txtCargandoBD: { color: '#fff', marginLeft: 8, fontSize: 13 },
+    txtPermiso: { textAlign: 'center', marginBottom: 15, color: '#475569', fontSize: 15 },
+    overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+    textoGuia: { color: '#fff', fontSize: 14, backgroundColor: 'rgba(30, 41, 59, 0.85)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginBottom: 25, fontWeight: '600' },
+    cuadroEnfoque: { width: 220, height: 220, borderWidth: 3, borderColor: '#525FE1', borderRadius: 16, marginBottom: 25 },
+    cajaCargandoBD: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10 },
+    txtCargandoBD: { color: '#fff', marginLeft: 8, fontSize: 13, fontWeight: '500' },
     
+    // Modal Estilos
     fondoModal: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    contenidoModal: { backgroundColor: '#fff', width: '100%', borderRadius: 14, padding: 20, alignItems: 'center', elevation: 10 },
-    modalTitulo: { fontSize: 16, fontWeight: 'bold', color: '#1a365d', marginBottom: 15 },
-    cajaDatosBloqueados: { backgroundColor: '#f8fafc', width: '100%', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
-    textoDetalle: { fontSize: 14, color: '#334155', marginBottom: 5 },
+    contenidoModal: { backgroundColor: '#fff', width: '90%', maxHeight: '80%', borderRadius: 20, padding: 20, alignItems: 'center', elevation: 10 },
+    modalTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 15, textAlign: 'center' },
+    cajaDatosBloqueados: { backgroundColor: '#f8fafc', width: '100%', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+    textoDetalle: { fontSize: 14, color: '#334155', marginBottom: 6 },
     negrita: { fontWeight: 'bold', color: '#1e293b' },
     divisor: { height: 1, backgroundColor: '#cbd5e1', width: '100%', marginVertical: 15 },
     
-    cajaFechaAutomatica: { backgroundColor: '#f0fdf4', width: '100%', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
+    cajaFechaAutomatica: { backgroundColor: '#f0fdf4', width: '100%', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', alignItems: 'center' },
     labelInformativo: { fontSize: 13, fontWeight: 'bold', color: '#166534', marginBottom: 4 },
-    textoFechaHoy: { fontSize: 20, fontWeight: 'bold', color: '#15803d', letterSpacing: 0.5 },
+    textoFechaHoy: { fontSize: 22, fontWeight: 'bold', color: '#15803d', letterSpacing: 0.5 },
     
-    botonAccion: { width: '100%', height: 46, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+    botonAccion: { width: '100%', height: 48, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
     textoBotonAccion: { color: '#fff', fontWeight: 'bold', fontSize: 15 }
 });

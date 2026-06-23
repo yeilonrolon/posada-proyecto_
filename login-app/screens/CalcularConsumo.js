@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, Pressable, StyleSheet } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import { estilosCalcularConsumo as styles } from '../styles/EstilosCalcularConsumo';
 import { BASE_URL } from './apiConfig';
-/**
- * PANTALLA: CÁLCULO DE CONSUMO
- * Función: Obtiene la diferencia de lecturas entre el mes actual y el anterior.
- */
+
 export default function CalcularConsumo() {
-    // Configuración de red (Asegúrate de que tu Linux Lite mantenga esta IP)
     const API_URL = BASE_URL;
 
     const fechaActual = new Date();
@@ -20,12 +16,14 @@ export default function CalcularConsumo() {
 
     const [tipo, setTipo] = useState('Agua');
     const [mes, setMes] = useState(mesActual);
+    // ✅ Nuevo estado para manejar el año del reporte de forma dinámica y evitar errores en fin de año
+    const [anioReporte, setAnioReporte] = useState(anioActual); 
     const [cargando, setCargando] = useState(false);
     const [resultado, setResultado] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [errorModalVisible, setErrorModalVisible] = useState(false);
     const [errorModalMensaje, setErrorModalMensaje] = useState('');
-    const [reportMode, setReportMode] = useState('Mes'); // 'Individual' | 'Mes' | 'Rango'
+    const [reportMode, setReportMode] = useState('Mes'); 
     const [generandoPdf, setGenerandoPdf] = useState(false);
     const [desdeMes, setDesdeMes] = useState(1);
     const [desdeAnio, setDesdeAnio] = useState(anioActual);
@@ -91,7 +89,7 @@ export default function CalcularConsumo() {
                             --accent: #4f46e5;
                         }
                         * { box-sizing: border-box; }
-                        body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+                        body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
                         .page { max-width: 820px; margin: 0 auto; padding: 24px; }
                         .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 28px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08); }
                         header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 28px; }
@@ -163,8 +161,8 @@ export default function CalcularConsumo() {
     };
 
     const ejecutarCalculo = async () => {
-        // Validaciones básicas
-        if (reportMode === 'Mes' && mes > mesActual) {
+        // Validación adaptada al año seleccionado
+        if (reportMode === 'Mes' && anioReporte === anioActual && mes > mesActual) {
             mostrarError('No puedes consultar un mes que aún no ha transcurrido.');
             return;
         }
@@ -172,7 +170,6 @@ export default function CalcularConsumo() {
         setCargando(true);
         try {
             if (reportMode === 'Individual') {
-                // Llama al endpoint que devuelve el último valor
                 const res = await axios.get(`${API_URL}/ultimo-consumo/${tipo}`);
                 if (res.data && res.data.success) {
                     setResultado({ type: 'Individual', tipo, ultimoValor: res.data.ultimoValor });
@@ -182,7 +179,8 @@ export default function CalcularConsumo() {
                 }
             } else if (reportMode === 'Mes') {
                 const res = await axios.get(`${API_URL}/calcular-consumo`, {
-                    params: { tipo, mes, anio: anioActual },
+                    // ✅ Ahora envía el año seleccionado del Picker en vez del año actual rígido
+                    params: { tipo, mes, anio: anioReporte }, 
                     timeout: 5000
                 });
                 if (res.data.success) {
@@ -194,7 +192,7 @@ export default function CalcularConsumo() {
                             type: 'Mes',
                             tipo,
                             mes,
-                            anio: anioActual,
+                            anio: anioReporte,
                             lectura_inicial: res.data.lectura_inicial,
                             lectura_final: res.data.lectura_final,
                             consumo: res.data.consumo,
@@ -206,12 +204,11 @@ export default function CalcularConsumo() {
                     mostrarError(res.data.mensaje || 'No se encontraron lecturas para el periodo seleccionado.');
                 }
             } else if (reportMode === 'Rango') {
-                // usamos el endpoint consumo-acumulado
                 const res = await axios.get(`${API_URL}/consumo-acumulado`, {
                     params: {
                         tipo,
-                        mes,
-                        anio: anioActual,
+                        mes, // Este actúa como el "hasta_mes"
+                        anio: anioReporte, // "hasta_anio"
                         desde_mes: desdeMes,
                         desde_anio: desdeAnio
                     },
@@ -245,15 +242,14 @@ export default function CalcularConsumo() {
             } else if (error?.response?.status === 400) {
                 mostrarError('No hay registros para el mes seleccionado. Elige otro mes o registra primero las lecturas necesarias.');
             } else {
-                mostrarError('No se pudo contactar con el servidor. Verifica que la PC esté encendida, que el backend esté corriendo y que el celular esté en el mismo WiFi.');
+                mostrarError('No se pudo contactar con el servidor. Verifica que el backend esté corriendo en tu red local.');
             }
         } finally {
             setCargando(false);
         }
     };
 
-
-    const esMesFuturo = mes > mesActual;
+    const esMesFuturo = anioReporte === anioActual && mes > mesActual;
 
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
@@ -298,12 +294,21 @@ export default function CalcularConsumo() {
                                 >
                                     {meses.map((m) => (
                                         <Picker.Item
-                                            key={m.value}
+                                            key={`mes-${m.value}`}
                                             label={m.label}
                                             value={m.value}
-                                            color={m.value > mesActual ? '#BDC3C7' : '#2C3E50'}
+                                            color={anioReporte === anioActual && m.value > mesActual ? '#BDC3C7' : '#2C3E50'}
                                         />
                                     ))}
+                                </Picker>
+                            </View>
+
+                            {/* ✅ Selector de año añadido para el modo mensual/rango */}
+                            <Text style={styles.label}>{reportMode === 'Rango' ? 'Seleccione Año (Hasta):' : 'Seleccione Año:'}</Text>
+                            <View style={styles.pickerContainer}>
+                                <Picker selectedValue={anioReporte} onValueChange={(v) => setAnioReporte(v)} style={styles.picker}>
+                                    <Picker.Item label={`${anioActual - 1}`} value={anioActual - 1} />
+                                    <Picker.Item label={`${anioActual}`} value={anioActual} />
                                 </Picker>
                             </View>
                         </>
@@ -319,7 +324,7 @@ export default function CalcularConsumo() {
                                     style={styles.picker}
                                 >
                                     {meses.map((m) => (
-                                        <Picker.Item key={`d${m.value}`} label={m.label} value={m.value} />
+                                        <Picker.Item key={`d-${m.value}`} label={m.label} value={m.value} />
                                     ))}
                                 </Picker>
                             </View>
@@ -348,12 +353,11 @@ export default function CalcularConsumo() {
                     </TouchableOpacity>
                 </View>
 
-
-                {/* Nota informativa para el operador */}
                 <Text style={{ textAlign: 'center', color: '#95a5a6', fontSize: 12, marginTop: 15 }}>
-                    * Los cálculos se basan en la diferencia entre la última lectura del mes elegido y la última del mes anterior.
+                    * Los cálculos se basan en la diferencia entre la última lectura del periodo elegido y la del periodo anterior.
                 </Text>
 
+                {/* MODAL: RESUMEN */}
                 <Modal
                     visible={modalVisible}
                     animationType="slide"
@@ -453,6 +457,7 @@ export default function CalcularConsumo() {
                     </View>
                 </Modal>
 
+                {/* MODAL: ERROR */}
                 <Modal
                     visible={errorModalVisible}
                     animationType="fade"
@@ -477,7 +482,8 @@ export default function CalcularConsumo() {
     );
 }
 
-const modalStyles = {
+// ✅ Optimizado usando el StyleSheet oficial para ganar performance nativo
+const modalStyles = StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -526,4 +532,4 @@ const modalStyles = {
         maxWidth: '60%',
         textAlign: 'right'
     }
-};
+});

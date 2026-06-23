@@ -104,14 +104,15 @@ router.get('/listar-habitaciones', async (req, res) =>{
     }
 });
 
-router.post('/registrar-habitacion', async (req,res) =>{
-    try{
-        const {tipo,estado} = req.body;
-        const query = 'insert into habitaciones(tipo,estdao) values($1, $2)';
-        await pool.query(query,[tipo,estado]);
-        res.status(201).json({ success: true, mensaje: 'Habitacion nueva agregada.' });
-    }catch (error) {
-        res.status(500).json({success: false, error: error.message});
+router.post('/registrar-habitacion', async (req, res) => {
+    try {
+        const { tipo, estado } = req.body;
+        // ✅ Corregido a 'estado'
+        const query = 'INSERT INTO habitaciones(tipo, estado) VALUES($1, $2)'; 
+        await pool.query(query, [tipo, estado]);
+        res.status(201).json({ success: true, mensaje: 'Habitación nueva agregada.' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

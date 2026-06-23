@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
     View, TextInput, TouchableOpacity, Text, Alert, StyleSheet, 
-    Image, ScrollView, KeyboardAvoidingView, Platform
+    Image, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios'; 
 import { BASE_URL } from './apiConfig';
 
 /**
- * PANTALLA: REGISTRO DE USUARIO
- * Función: Crear nuevos accesos escribiendo libremente preguntas y respuestas de seguridad.
- * Todo se almacena de forma estandarizada en minúsculas.
+ * PANTALLA: REGISTRO DE USUARIO / PERSONAL
+ * Función: Crea nuevos accesos de seguridad (Administrador o Mantenimiento).
+ * Las preguntas y respuestas de seguridad se normalizan automáticamente a minúsculas.
  */
 export default function RegistroUsuario({ navigation }) {
     const [nombre, setNombre] = useState('');
@@ -18,11 +18,13 @@ export default function RegistroUsuario({ navigation }) {
     const [clave, setClave] = useState('');
     const [rol, setRol] = useState('');
 
-    // Estados adaptados a texto libre escrito por el usuario
+    // Preguntas y respuestas personalizadas escritas libremente por el usuario
     const [pregunta1, setPregunta1] = useState('');
     const [respuesta1, setRespuesta1] = useState('');
     const [pregunta2, setPregunta2] = useState('');
     const [respuesta2, setRespuesta2] = useState('');
+
+    const [cargando, setCargando] = useState(false);
 
     // Estado de validación detallado para la contraseña
     const [validaciones, setValidaciones] = useState({
@@ -51,38 +53,47 @@ export default function RegistroUsuario({ navigation }) {
         pregunta1.trim() && respuesta1.trim() && 
         pregunta2.trim() && respuesta2.trim();
 
+    const botonHabilitado = todoValido && camposCompletos && !cargando;
+
     const handleRegistro = async () => {
-        if (!camposCompletos) {
-            return Alert.alert("Atención", "Por favor, completa todos los campos de texto.");
+        if (!camposCompletos || !todoValido) {
+            return Alert.alert("Atención", "Por favor, completa correctamente todos los campos y requisitos.");
         }
+
+        setCargando(true);
+        Keyboard.dismiss();
 
         try {
             const url = `${BASE_URL}/crearusuario`;
             
-            // TRANSFORMACIÓN: Forzamos preguntas y respuestas a minúsculas antes de la inyección en la BD
+            // NORMALIZACIÓN: Homogeneidad estricta para evitar fallos de coincidencia de strings
             const datosEnviar = {
                 nombre: nombre.trim(),
-                usuario: usuario.trim().toLowerCase(), // Almacenado homogéneo
+                usuario: usuario.trim().toLowerCase(),
                 clave: clave,
                 rol: rol,
-                pregunta1: pregunta1.trim().toLowerCase(),   // 👈 Guardado en minúscula
-                respuesta1: respuesta1.trim().toLowerCase(), // 👈 Guardado en minúscula
-                pregunta2: pregunta2.trim().toLowerCase(),   // 👈 Guardado en minúscula
-                respuesta2: respuesta2.trim().toLowerCase()  // 👈 Guardado en minúscula
+                pregunta1: pregunta1.trim().toLowerCase(),
+                respuesta1: respuesta1.trim().toLowerCase(),
+                pregunta2: pregunta2.trim().toLowerCase(),
+                respuesta2: respuesta2.trim().toLowerCase()
             };
 
-            const res = await axios.post(url, datosEnviar);
+            const res = await axios.post(url, datosEnviar, { timeout: 6000 });
             
-            if (res.data.success) {
-                Alert.alert("Éxito", "Personal registrado correctamente.");
+            if (res.data && res.data.success) {
+                Alert.alert("✅ Éxito", "Personal registrado correctamente en el sistema central.");
                 navigation.goBack();
             } else {
-                Alert.alert("Error", res.data.mensaje || "El usuario ya existe.");
+                Alert.alert("Aviso", res.data.mensaje || "El nombre de usuario ya se encuentra registrado.");
             }
         } catch (error) {
-            // Imprime el error exacto en la terminal de Metro por si acaso para depurar rápido
             console.log("Error detallado en Axios:", error.message);
-            Alert.alert("Error de Conexión", "No se pudo alcanzar el servidor.");
+            Alert.alert(
+                "Error de Conexión", 
+                "No se pudo alcanzar el servidor local de la posada. Verifique la red."
+            );
+        } finally {
+            setCargando(false);
         }
     };
 
@@ -121,7 +132,7 @@ export default function RegistroUsuario({ navigation }) {
                                 onChangeText={setNombre} 
                                 value={nombre}
                                 style={styles.input} 
-                                placeholderTextColor="#cbd5e1"
+                                placeholderTextColor="#94a3b8"
                             />
                         </View>
 
@@ -134,7 +145,8 @@ export default function RegistroUsuario({ navigation }) {
                                 value={usuario}
                                 style={styles.input} 
                                 autoCapitalize="none"
-                                placeholderTextColor="#cbd5e1"
+                                autoCorrect={false}
+                                placeholderTextColor="#94a3b8"
                             />
                         </View>
 
@@ -148,7 +160,8 @@ export default function RegistroUsuario({ navigation }) {
                                 value={clave}
                                 style={styles.input} 
                                 maxLength={8}
-                                placeholderTextColor="#cbd5e1"
+                                autoCapitalize="none"
+                                placeholderTextColor="#94a3b8"
                             />
                             
                             <View style={styles.containerValidaciones}>
@@ -170,18 +183,19 @@ export default function RegistroUsuario({ navigation }) {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Seguridad #1</Text>
                             <TextInput 
-                                placeholder="Escribe tu propia Pregunta #1" 
+                                placeholder="Pregunta personalizada #1 (Ej. Nombre de tu primera mascota)" 
                                 onChangeText={setPregunta1} 
                                 value={pregunta1}
                                 style={styles.input} 
-                                placeholderTextColor="#cbd5e1"
+                                placeholderTextColor="#94a3b8"
                             />
                             <TextInput 
-                                placeholder="Escribe tu Respuesta #1" 
+                                placeholder="Respuesta secreta #1" 
                                 onChangeText={setRespuesta1} 
                                 value={respuesta1}
                                 style={[styles.input, { marginTop: 8 }]} 
-                                placeholderTextColor="#cbd5e1"
+                                placeholderTextColor="#94a3b8"
+                                autoCapitalize="none"
                             />
                         </View>
 
@@ -189,18 +203,19 @@ export default function RegistroUsuario({ navigation }) {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Seguridad #2</Text>
                             <TextInput 
-                                placeholder="Escribe tu propia Pregunta #2" 
+                                placeholder="Pregunta personalizada #2 (Ej. Ciudad donde naciste)" 
                                 onChangeText={setPregunta2} 
                                 value={pregunta2}
                                 style={styles.input} 
-                                placeholderTextColor="#cbd5e1"
+                                placeholderTextColor="#94a3b8"
                             />
                             <TextInput 
-                                placeholder="Escribe tu Respuesta #2" 
+                                placeholder="Respuesta secreta #2" 
                                 onChangeText={setRespuesta2} 
                                 value={respuesta2}
                                 style={[styles.input, { marginTop: 8 }]} 
-                                placeholderTextColor="#cbd5e1"
+                                placeholderTextColor="#94a3b8"
+                                autoCapitalize="none"
                             />
                         </View>
 
@@ -211,12 +226,14 @@ export default function RegistroUsuario({ navigation }) {
                                 <TouchableOpacity 
                                     style={[styles.rolOption, rol === 'mantenimiento' && styles.rolSelected]} 
                                     onPress={() => setRol('mantenimiento')}
+                                    activeOpacity={0.7}
                                 >
                                     <Text style={[styles.rolText, rol === 'mantenimiento' && styles.rolTextSelected]}>Mantenimiento</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity 
                                     style={[styles.rolOption, rol === 'admin' && styles.rolSelected]} 
                                     onPress={() => setRol('admin')}
+                                    activeOpacity={0.7}
                                 >
                                     <Text style={[styles.rolText, rol === 'admin' && styles.rolTextSelected]}>Administrador</Text>
                                 </TouchableOpacity>
@@ -226,10 +243,15 @@ export default function RegistroUsuario({ navigation }) {
                         {/* BOTÓN PRINCIPAL */}
                         <TouchableOpacity 
                             onPress={handleRegistro} 
-                            style={[styles.btn, { backgroundColor: todoValido && camposCompletos ? '#525FE1' : '#cbd5e1' }]} 
-                            disabled={!todoValido || !camposCompletos}
+                            style={[styles.btn, { backgroundColor: botonHabilitado ? '#525FE1' : '#cbd5e1' }]} 
+                            disabled={!botonHabilitado}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.btnText}>CREAR CUENTA</Text>
+                            {cargando ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.btnText}>CREAR CUENTA</Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -248,7 +270,7 @@ const styles = StyleSheet.create({
     loginCard: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 25, padding: 25, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
     inputGroup: { marginBottom: 18 },
     label: { fontSize: 13, color: '#475569', marginBottom: 8, fontWeight: '700' },
-    input: { padding: 14, backgroundColor: '#f1f5f9', borderRadius: 12, fontSize: 16, color: '#1e293b' },
+    input: { padding: 14, backgroundColor: '#f1f5f9', borderRadius: 12, fontSize: 15, color: '#1e293b' },
     containerValidaciones: { marginTop: 12, padding: 12, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
     valRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
     especialRow: { marginTop: 2 },

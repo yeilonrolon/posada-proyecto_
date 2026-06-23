@@ -132,5 +132,96 @@ router.put('/eliminarusuario', async(req,res) =>{
         res.status(500).json({success: false, error: error.message})
     }
 });
+// ============================================================================
+// ENDPOINTS PARA LA RECUPERACIÓN DE CONTRASEÑA (FLUJO EN 3 PASOS)
+// ============================================================================
+
+// PASO 1: Verificar usuario y retornar el ID junto con las preguntas de seguridad
+router.post('/verificar-usuario-recuperacion', async (req, res) => {
+    const { usuario } = req.body;
+    
+    if (!usuario) {
+        return res.json({ success: false, mensaje: "El campo usuario es obligatorio." });
+    }
+
+    try {
+        const query = `
+            SELECT id, pregunta1, pregunta2 
+            FROM usuarios 
+            WHERE LOWER(usuario) = LOWER($1) AND activo = true
+        `;
+        const resultado = await pool.query(query, [usuario.trim()]);
+
+        if (resultado.rows.length > 0) {
+            res.json({ 
+                success: true, 
+                datos: {
+                    id: resultado.rows[0].id,
+                    pregunta1: resultado.rows[0].pregunta1,
+                    pregunta2: resultado.rows[0].pregunta2
+                }
+            });
+        } else {
+            res.json({ success: false, mensaje: "El usuario no existe o se encuentra inactivo." });
+        }
+    } catch (error) {
+        console.error("Error en /verificar-usuario-recuperacion:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PASO 2: Verificar si las respuestas ingresadas coinciden con la BD
+router.post('/verificar-respuestas', async (req, res) => {
+    const { id, respuesta1, respuesta2 } = req.body;
+
+    try {
+        const query = `
+            SELECT respuesta1, respuesta2 
+            FROM usuarios 
+            WHERE id = $1 AND activo = true
+        `;
+        const resultado = await pool.query(query, [id]);
+
+        if (resultado.rows.length > 0) {
+            const user = resultado.rows[0];
+            
+            // Validamos que ambas respuestas coincidan limpiando espacios y minúsculas
+            const r1Correcta = user.respuesta1 === (respuesta1 ? respuesta1.trim().toLowerCase() : '');
+            const r2Correcta = user.respuesta2 === (respuesta2 ? respuesta2.trim().toLowerCase() : '');
+
+            if (r1Correcta && r2Correcta) {
+                res.json({ success: true, mensaje: "Respuestas validadas correctamente." });
+            } else {
+                res.json({ success: false, mensaje: "Las respuestas de seguridad son incorrectas." });
+            }
+        } else {
+            res.json({ success: false, mensaje: "Usuario no encontrado." });
+        }
+    } catch (error) {
+        console.error("Error en /verificar-respuestas:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PASO 3: Actualizar la contraseña del usuario y resetear intentos/bloqueos
+router.post('/actualizar-clave-recuperacion', async (req, res) => {
+    const { id, nuevaClave } = req.body;
+
+    try {
+        // Actualizamos la clave y de paso limpiamos el contador de intentos por seguridad
+        const query = `
+            UPDATE usuarios 
+            SET clave = $1, intentos = 0, bloqueado = false 
+            WHERE id = $2 AND activo = true
+        `;
+        await pool.query(query, [nuevaClave, id]);
+
+        res.json({ success: true, mensaje: "Contraseña reestablecida exitosamente." });
+    } catch (error) {
+        console.error("Error en /actualizar-clave-recuperacion:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 module.exports = router;

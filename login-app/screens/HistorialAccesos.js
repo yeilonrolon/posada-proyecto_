@@ -11,12 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { BASE_URL } from './apiConfig';
+
 /**
  * PANTALLA: HISTORIAL DE ACCESOS
  * Función: Muestra quién ha entrado al sistema mediante la tabla de auditoría del backend.
  */
 export default function HistorialAccesos() {
-    // URL del servidor (Linux Lite)
     const API_URL = BASE_URL;
 
     const [accesos, setAccesos] = useState([]);
@@ -27,7 +27,7 @@ export default function HistorialAccesos() {
     const obtenerAccesos = useCallback(async () => {
         try {
             const res = await axios.get(`${API_URL}/historial-accesos`, { timeout: 7000 });
-            if (res.data.success) {
+            if (res.data.success && Array.isArray(res.data.datos)) {
                 setAccesos(res.data.datos);
             }
         } catch (error) {
@@ -40,18 +40,18 @@ export default function HistorialAccesos() {
             setCargando(false);
             setRefrescando(false);
         }
-    }, []);
+    }, [API_URL]);
 
-    // Carga inicial
+    // Carga inicial al montar el componente
     useEffect(() => {
         obtenerAccesos();
     }, [obtenerAccesos]);
 
-    // Función para refrescar al jalar hacia abajo
-    const alRefrescar = () => {
+    // Función para manejar el "pull-to-refresh"
+    const alRefrescar = useCallback(() => {
         setRefrescando(true);
         obtenerAccesos();
-    };
+    }, [obtenerAccesos]);
 
     // Diseño de cada tarjeta de acceso
     const renderAcceso = ({ item }) => (
@@ -77,10 +77,10 @@ export default function HistorialAccesos() {
                 <Text style={styles.subtitulo}>Últimos inicios de sesión registrados</Text>
             </View>
 
-            {cargando ? (
+            {cargando && !refrescando ? (
                 <View style={styles.loadingCenter}>
                     <ActivityIndicator size="large" color="#525FE1" />
-                    <Text style={{ marginTop: 10, color: '#7f8c8d' }}>Consultando base de datos...</Text>
+                    <Text style={styles.textoCargando}>Consultando base de datos...</Text>
                 </View>
             ) : (
                 <FlatList
@@ -93,8 +93,8 @@ export default function HistorialAccesos() {
                         <RefreshControl 
                             refreshing={refrescando} 
                             onRefresh={alRefrescar} 
-                            colors={["#525FE1"]} // Color para Android
-                            tintColor="#525FE1"   // Color para iOS
+                            colors={["#525FE1"]} // Android
+                            tintColor="#525FE1"   // iOS
                         />
                     }
                     ListEmptyComponent={
@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
     subtitulo: { fontSize: 14, color: '#7f8c8d', marginTop: 4 },
     listaContainer: { paddingHorizontal: 15, paddingVertical: 10, paddingBottom: 30 },
     loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    textoCargando: { marginTop: 10, color: '#7f8c8d' },
     card: { 
         backgroundColor: '#FFFFFF', 
         borderRadius: 12, 

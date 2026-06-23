@@ -1,31 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, ScrollView } from 'react-native';
+import { 
+  StyleSheet, Text, View, FlatList, TouchableOpacity, 
+  ActivityIndicator, Alert, Modal, TextInput, ScrollView, InteractionManager 
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as MediaLibrary from 'expo-media-library';
-
-// CORREGIDO: Importación exacta usando desestructuración con llaves { } 
 import { BASE_URL } from './apiConfig'; 
-
-// Mantenemos la importación legacy que solucionó el error en Expo 54
 import * as FileSystem from 'expo-file-system/legacy'; 
 
 export default function PantallaListaQR({ navigation, route }) {
-  const {idUsuario} = route.params || {};
+  const { idUsuario } = route.params || {};
   const [equipos, setEquipos] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [procesandoFlujo, setProcesandoFlujo] = useState(false); // Estado para evitar doble envío
+  const [procesandoFlujo, setProcesandoFlujo] = useState(false); 
   
-  // Estados para el Modal de Edición y QR
   const [modalVisible, setModalVisible] = useState(false);
   const [idSeleccionado, setIdSeleccionado] = useState(null);
   const [nombreEdit, setNombreEdit] = useState('');
   const [ubicacionEdit, setUbicacionEdit] = useState('');
   const [frecuenciaEdit, setFrecuenciaEdit] = useState('');
 
-  // Referencia para capturar el gráfico del código QR dinámico
   const qrRef = useRef(null);
-
-  // Endpoint unificado usando la constante importada
   const API_URL = `${BASE_URL}/api/equipos`;
 
   const obtenerEquiposBD = async () => {
@@ -34,7 +29,6 @@ export default function PantallaListaQR({ navigation, route }) {
       const respuesta = await fetch(API_URL);
       const datos = await respuesta.json();
       
-      // CORREGIDO: Tu backend retorna los renglones en la propiedad '.datos'
       if (respuesta.ok && datos.success) {
         setEquipos(datos.datos); 
       } else {
@@ -44,8 +38,7 @@ export default function PantallaListaQR({ navigation, route }) {
       console.error(error);
       Alert.alert('Error de conexión', 'Verifica el backend y tu red Wi-Fi.');
     } finally {
-      // Pequeño timeout por si la respuesta es instantánea, asegurando estabilidad visual
-      setTimeout(() => setCargando(false), 300);
+      setCargando(false);
     }
   };
 
@@ -56,6 +49,48 @@ export default function PantallaListaQR({ navigation, route }) {
     });
     return ordenarRecarga;
   }, [navigation]);
+
+  // ==========================================
+  // NUEVA FUNCIÓN: ELIMINAR ACTIVO EN POSTGRES
+  // ==========================================
+  const ejecutarEliminacion = async (idEquipo) => {
+    try {
+      setCargando(true);
+      const respuesta = await fetch(`${API_URL}/${idEquipo}`, {
+        method: 'DELETE',
+      });
+      const resultado = await respuesta.json();
+
+      if (respuesta.ok && resultado.success) {
+        Alert.alert('Eliminado 🗑️', 'El equipo ha sido removido del sistema con éxito.');
+        obtenerEquiposBD(); // Refrescar la lista de inmediato
+      } else {
+        Alert.alert('Error', resultado.error || 'No se pudo eliminar el activo.');
+        setCargando(false);
+      }
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      Alert.alert('Error de Red', 'No se pudo comunicar con el servidor.');
+      setCargando(false);
+    }
+  };
+
+  const presionarBotonEliminar = (equipo) => {
+    // Doble confirmación nativa para proteger los datos de inventario
+    Alert.alert(
+      '⚠️ ELIMINAR ACTIVO',
+      `¿Estás completamente seguro de eliminar el equipo "${equipo.nombre_equipo}"? Esta acción borrará permanentemente el registro en PostgreSQL.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Sí, Eliminar', 
+          style: 'destructive', 
+          onPress: () => ejecutarEliminacion(equipo.id) 
+        }
+      ],
+      { cancelable: true }
+    );
+  };
 
   const abrirEditorYQR = (equipo) => {
     setIdSeleccionado(equipo.id);
@@ -69,7 +104,6 @@ export default function PantallaListaQR({ navigation, route }) {
     try {
       setProcesandoFlujo(true);
 
-      // 1. Validar primero los permisos de almacenamiento/galería
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permiso requerido', 'Necesitamos acceso a la galería para guardar el nuevo código QR.');
@@ -77,7 +111,6 @@ export default function PantallaListaQR({ navigation, route }) {
         return;
       }
 
-      // 2. Ejecutar la actualización en PostgreSQL a través de la API
       const respuesta = await fetch(`${API_URL}/${idSeleccionado}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +130,8 @@ export default function PantallaListaQR({ navigation, route }) {
         return;
       }
 
-      // 3. Si la BD se actualizó con éxito, procedemos a capturar el Base64 del QR actual
+      await new Promise((resolve) => InteractionManager.runAfterInteractions(resolve));
+
       if (!qrRef.current) {
         Alert.alert('Error de Render', 'El gráfico QR no está listo para ser exportado.');
         setProcesandoFlujo(false);
@@ -120,7 +154,6 @@ export default function PantallaListaQR({ navigation, route }) {
         return;
       }
 
-      // 4. Crear el archivo PNG temporal en el caché del celular
       const nombreArchivo = `QR_Actualizado_ID${idSeleccionado}_${Date.now()}.png`;
       const rutaTemporal = `${FileSystem.cacheDirectory}${nombreArchivo}`;
 
@@ -128,10 +161,8 @@ export default function PantallaListaQR({ navigation, route }) {
         encoding: 'base64',
       });
 
-      // 5. Mover el archivo temporal directamente al carrete de fotos
       await MediaLibrary.saveToLibraryAsync(rutaTemporal);
 
-      // 6. Notificar éxito, cerrar modal y refrescar la tabla del inventario
       Alert.alert(
         '¡Actualización Exitosa! 🔄📥', 
         `Los datos del activo #${idSeleccionado} se guardaron en PostgreSQL y el nuevo código QR se descargó automáticamente en tu galería para que lo imprimas.`
@@ -165,7 +196,6 @@ export default function PantallaListaQR({ navigation, route }) {
     );
   };
 
-  // Cadena JSON en tiempo real para el componente QR
   const cadenaDatosQR = JSON.stringify({
     id: idSeleccionado,
     nombre_equipo: nombreEdit.trim(),
@@ -179,18 +209,28 @@ export default function PantallaListaQR({ navigation, route }) {
       : 'Sin revisiones';
 
     return (
-      <TouchableOpacity style={styles.tarjeta} onPress={() => abrirEditorYQR(item)}>
-        <View style={styles.infoIzquierda}>
+      <View style={styles.tarjeta}>
+        {/* Contenido clickeable para abrir edición */}
+        <TouchableOpacity style={styles.infoIzquierda} onPress={() => abrirEditorYQR(item)} activeOpacity={0.6}>
           <Text style={styles.idBadge}>ID: #{item.id}</Text>
           <Text style={styles.itemNombre}>{item.nombre_equipo}</Text>
           <Text style={styles.itemUbicacion}>📍 {item.ubicacion}</Text>
           <Text style={styles.itemFecha}>🔧 Última revisión: {fechaFormateada}</Text>
-          <Text style={styles.revisado}>{item.nombre_usuario}</Text>
+          {item.nombre_usuario && <Text style={styles.revisado}>👤 Por: {item.nombre_usuario}</Text>}
+        </TouchableOpacity>
+
+        {/* Panel lateral derecho de acciones rápidas */}
+        <View style={styles.columnaAcciones}>
+          <TouchableOpacity style={styles.indicadorQR} onPress={() => abrirEditorYQR(item)}>
+            <Text style={styles.textoMiniQR}>⚙️ QR</Text>
+          </TouchableOpacity>
+          
+          {/* BOTÓN NUEVO DE ELIMINAR */}
+          <TouchableOpacity style={styles.botonEliminarTarjeta} onPress={() => presionarBotonEliminar(item)}>
+            <Text style={styles.textoEliminarTarjeta}>🗑️</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.indicadorQR}>
-          <Text style={styles.textoMiniQR}>⚙️ Editar / QR</Text>
-        </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -200,8 +240,8 @@ export default function PantallaListaQR({ navigation, route }) {
 
       {cargando ? (
         <View style={styles.centroCarga}>
-          <ActivityIndicator size="large" color="#1a365d" />
-          <Text style={styles.textoCarga}>Consultando PostgreSQL...</Text>
+          <ActivityIndicator size="large" color="#8b5cf6" />
+          <Text style={styles.textoCarga}>Procesando base de datos...</Text>
         </View>
       ) : (
         <FlatList
@@ -209,6 +249,7 @@ export default function PantallaListaQR({ navigation, route }) {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listaContenedor}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={styles.listaVacia}>No hay equipos registrados en el sistema todavía.</Text>
           }
@@ -217,25 +258,24 @@ export default function PantallaListaQR({ navigation, route }) {
 
       {/* MODAL INTEGRADO */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => !procesandoFlujo && setModalVisible(false)}
       >
         <View style={styles.fondoModal}>
           <View style={styles.contenidoModal}>
-            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center' }}>
+            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center' }} showsVerticalScrollIndicator={false}>
               
               <Text style={styles.modalTitulo}>Gestión del Activo #{idSeleccionado}</Text>
               
-              {/* Sección del QR con la referencia integrada */}
               <View style={styles.qrModalContainer}>
                 {idSeleccionado && (
                   <QRCode 
                     value={cadenaDatosQR} 
                     size={160} 
                     backgroundColor="#fff" 
-                    color="#1a365d" 
+                    color="#0f172a" 
                     getRef={qrRef}
                   />
                 )}
@@ -270,11 +310,11 @@ export default function PantallaListaQR({ navigation, route }) {
                 />
               </View>
 
-              {/* Botón Principal unificado con bloqueo anti-spam */}
               <TouchableOpacity 
                 style={[styles.botonGuardar, procesandoFlujo && styles.botonDeshabilitado]} 
                 onPress={presionarBotonGuardar}
                 disabled={procesandoFlujo}
+                activeOpacity={0.8}
               >
                 {procesandoFlujo ? (
                   <ActivityIndicator color="#fff" />
@@ -287,6 +327,7 @@ export default function PantallaListaQR({ navigation, route }) {
                 style={[styles.botonCerrarModal, procesandoFlujo && styles.botonDeshabilitado]} 
                 onPress={() => setModalVisible(false)}
                 disabled={procesandoFlujo}
+                activeOpacity={0.7}
               >
                 <Text style={styles.textoBotonCerrar}>Volver Atrás</Text>
               </TouchableOpacity>
@@ -300,38 +341,43 @@ export default function PantallaListaQR({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 15 },
-  subtitulo: { fontSize: 18, fontWeight: 'bold', color: '#1a365d', marginBottom: 15 },
+  container: { flex: 1, backgroundColor: '#f1f5f9', padding: 15 },
+  subtitulo: { fontSize: 15, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 15 },
   centroCarga: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  textoCarga: { marginTop: 10, color: '#475569', fontSize: 14 },
+  textoCarga: { marginTop: 10, color: '#64748b', fontSize: 13, fontWeight: '500' },
   listaContenedor: { paddingBottom: 20 },
-  listaVacia: { textAlign: 'center', color: '#64748b', marginTop: 40, fontSize: 15 },
+  listaVacia: { textAlign: 'center', color: '#64748b', marginTop: 40, fontSize: 14, fontWeight: '500' },
   tarjeta: { 
-    backgroundColor: '#fff', borderRadius: 10, padding: 15, marginBottom: 12, 
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 
+    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 1,
+    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2
   },
-  infoIzquierda: { flex: 1 },
-  idBadge: { backgroundColor: '#e2e8f0', color: '#334155', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 11, fontWeight: 'bold', marginBottom: 5 },
-  itemNombre: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 3 },
-  itemUbicacion: { fontSize: 13, color: '#475569', marginBottom: 3 },
-  revisado:{ fontSize: 13, color: '#475569', marginBottom: 3 },
-  itemFecha: { fontSize: 12, color: '#0f766e', fontWeight: '500' },
-  indicadorQR: { padding: 8, backgroundColor: '#f1f5f9', borderRadius: 6 },
-  textoMiniQR: { fontSize: 12, color: '#0284c7', fontWeight: '600' },
+  infoIzquierda: { flex: 1, paddingRight: 10 },
+  idBadge: { backgroundColor: '#e2e8f0', color: '#475569', alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, fontSize: 10, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase' },
+  itemNombre: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  itemUbicacion: { fontSize: 13, color: '#475569', marginBottom: 4, fontWeight: '500' },
+  revisado: { fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: '500' },
+  itemFecha: { fontSize: 12, color: '#0f766e', fontWeight: '600' },
   
-  fondoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 15 },
-  contenidoModal: { backgroundColor: '#fff', width: '100%', maxHeight: '90%', borderRadius: 12, padding: 20, alignItems: 'center', elevation: 5 },
-  modalTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1a365d', marginBottom: 15 },
-  qrModalContainer: { padding: 10, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 5 },
-  modalInstrucciones: { fontSize: 11, color: '#64748b', marginBottom: 15, textAlign: 'center' },
+  // Panel derecho ajustado para dos botones limpios
+  columnaAcciones: { alignItems: 'center', justifyContent: 'center', gap: 8 },
+  indicadorQR: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  textoMiniQR: { fontSize: 11, color: '#3b82f6', fontWeight: '700' },
+  botonEliminarTarjeta: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#fef2f2', borderRadius: 8, borderWidth: 1, borderColor: '#fee2e2' },
+  textoEliminarTarjeta: { fontSize: 13 },
+
+  fondoModal: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.3)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  contenidoModal: { backgroundColor: '#fff', width: '100%', maxHeight: '85%', borderRadius: 16, padding: 20, alignItems: 'center', elevation: 5 },
+  modalTitulo: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
+  qrModalContainer: { padding: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 6 },
+  modalInstrucciones: { fontSize: 11, color: '#64748b', marginBottom: 16, textAlign: 'center', fontWeight: '500', paddingHorizontal: 10 },
   formEdicion: { width: '100%', marginBottom: 15 },
-  labelModal: { fontSize: 13, fontWeight: '500', color: '#334155', marginBottom: 4 },
-  inputModal: { width: '100%', height: 40, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, paddingHorizontal: 10, marginBottom: 12, color: '#1e293b' },
-  inputDeshabilitado: { backgroundColor: '#f1f5f9', color: '#94a3b8' },
-  botonGuardar: { backgroundColor: '#2563eb', paddingVertical: 12, borderRadius: 6, width: '100%', alignItems: 'center', marginBottom: 10 },
-  botonDeshabilitado: { backgroundColor: '#94a3b8' },
-  textoBotonAccion: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
-  botonCerrarModal: { backgroundColor: '#64748b', paddingVertical: 10, borderRadius: 6, width: '100%', alignItems: 'center' },
-  textoBotonCerrar: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  
+  labelModal: { fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 5 },
+  inputModal: { width: '100%', height: 44, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 12, marginBottom: 12, color: '#0f172a', backgroundColor: '#f8fafc', fontSize: 14 },
+  inputDeshabilitado: { backgroundColor: '#e2e8f0', color: '#94a3b8' },
+  botonGuardar: { backgroundColor: '#8b5cf6', paddingVertical: 13, borderRadius: 10, width: '100%', alignItems: 'center', marginBottom: 10, elevation: 1 },
+  botonDeshabilitado: { backgroundColor: '#cbd5e1' },
+  textoBotonAccion: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  botonCerrarModal: { backgroundColor: '#ffffff', paddingVertical: 12, borderRadius: 10, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#64748b' },
+  textoBotonCerrar: { color: '#64748b', fontSize: 14, fontWeight: '600' },
 });

@@ -1,28 +1,26 @@
 import React from 'react';
 import { Text, StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-// Importamos FontAwesome y MaterialCommunityIcons para tener íconos profesionales
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 
-/**
- * PANTALLA: PANEL ADMINISTRATIVO (Diseño Profesional)
- */
-export default function Admin({ route, navigation }) {
-    // Extraemos las credenciales y el rol que vienen desde el Login
-    const { idUsuario, nombreUsuario, rol } = route.params || {};
-
-    // Helper para renderizar cada botón de manera limpia, ordenada y con un chevron a la derecha
-    const RenderBotonAdmin = ({ titulo, subtitulo, icono, libreria: LibreriaIcono, colorAcento, onPress }) => (
+// ✅ Helper extraído fuera del componente para evitar re-creación y parpadeos en los renders
+const RenderBotonAdmin = ({ titulo, subtitulo, icono, libreria: LibreriaIcono, colorAcento, onPress }) => {
+    return (
         <TouchableOpacity style={styles.tarjetaBoton} onPress={onPress} activeOpacity={0.7}>
             <View style={[styles.contenedorIcono, { backgroundColor: `${colorAcento}15` }]}>
                 <LibreriaIcono name={icono} size={22} color={colorAcento} />
             </View>
             <View style={styles.bloqueTexto}>
                 <Text style={styles.textoPrincipal} numberOfLines={1}>{titulo}</Text>
-                <Text style={styles.textoSecundario} numberOfLines={1}>{subtitulo}</Text>
+                <Text style={styles.textoSecundario} numberOfLines={2}>{subtitulo}</Text>
             </View>
             <FontAwesome name="chevron-right" size={12} color="#b0bec5" style={styles.flechaDerecha} />
         </TouchableOpacity>
     );
+};
+
+export default function Admin({ route, navigation }) {
+    // Extraemos las credenciales y el rol que vienen desde el Login
+    const { idUsuario, nombreUsuario, rol } = route.params || {};
 
     return (
         <SafeAreaView style={styles.contenedor}>
@@ -34,7 +32,7 @@ export default function Admin({ route, navigation }) {
                     <Text style={styles.subtitulo}>
                         Bienvenido, <Text style={styles.nombreResaltado}>{nombreUsuario || 'Usuario'}</Text>
                     </Text>
-                    <Text style={styles.fechaTexto}>Última sesión activa: {new Date().toLocaleDateString()}</Text>
+                    <Text style={styles.fechaTexto}>Sesión activa: {new Date().toLocaleDateString()}</Text>
                 </View>
 
                 {/* SECCIÓN: OPERACIONES CENTRALES */}
@@ -45,7 +43,7 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Lecturas de Luz y Agua"
                     icono="flash"
                     libreria={MaterialCommunityIcons}
-                    colorAcento="#3b82f6" // Azul moderno
+                    colorAcento="#3b82f6"
                     onPress={() => navigation.navigate('CrearLuzAgua', { idUsuario, nombreUsuario, rol })}
                 />
 
@@ -54,7 +52,7 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Inventario, Etiquetas e Inspección"
                     icono="qrcode"
                     libreria={FontAwesome}
-                    colorAcento="#8b5cf6" // Morado tecnológico
+                    colorAcento="#8b5cf6"
                     onPress={() => navigation.navigate('qr', { idUsuario, nombreUsuario, rol })}
                 />
 
@@ -63,7 +61,7 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Auditoría de Costos de Reparación"
                     icono="currency-usd"
                     libreria={MaterialCommunityIcons}
-                    colorAcento="#10b981" // Verde esmeralda
+                    colorAcento="#10b981"
                     onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })}
                 />
 
@@ -75,7 +73,7 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Auditoría de Estados de Habitaciones"
                     icono="bed"
                     libreria={FontAwesome}
-                    colorAcento="#6366f1" // Índigo
+                    colorAcento="#6366f1"
                     onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })}
                 />
 
@@ -84,7 +82,7 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Auditoría de Estados de Baños"
                     icono="toilet"
                     libreria={MaterialCommunityIcons}
-                    colorAcento="#06b6d4" // Cian
+                    colorAcento="#06b6d4"
                     onPress={() => navigation.navigate('EstadoBano', { idUsuario, nombreUsuario, rol })}
                 />
 
@@ -96,8 +94,9 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Registrar personal nuevo"
                     icono="user-plus"
                     libreria={FontAwesome}
-                    colorAcento="#f59e0b" // Ámbar corporativo
-                    onPress={() => navigation.navigate('Registro')}
+                    colorAcento="#f59e0b"
+                    // ✅ Parámetros añadidos para mantener la trazabilidad de quién registra
+                    onPress={() => navigation.navigate('Registro', { idUsuario, nombreUsuario, rol })}
                 />
 
                 <RenderBotonAdmin 
@@ -105,8 +104,9 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Editar y gestionar activos"
                     icono="users"
                     libreria={FontAwesome}
-                    colorAcento="#4b5563" // Gris oscuro slate
-                    onPress={() => navigation.navigate('PanelUsuarios')}
+                    colorAcento="#4b5563"
+                    // ✅ Parámetros añadidos
+                    onPress={() => navigation.navigate('PanelUsuarios', { idUsuario, nombreUsuario, rol })}
                 />
 
                 <RenderBotonAdmin 
@@ -114,8 +114,9 @@ export default function Admin({ route, navigation }) {
                     subtitulo="Personal dado de baja"
                     icono="user-times"
                     libreria={FontAwesome}
-                    colorAcento="#ef4444" // Rojo sutil
-                    onPress={() => navigation.navigate('MostrarUsuariosInactivos')}
+                    colorAcento="#ef4444"
+                    // ✅ Parámetros añadidos
+                    onPress={() => navigation.navigate('MostrarUsuariosInactivos', { idUsuario, nombreUsuario, rol })}
                 />
 
                 <RenderBotonAdmin 
@@ -124,7 +125,8 @@ export default function Admin({ route, navigation }) {
                     icono="history"
                     libreria={MaterialCommunityIcons}
                     colorAcento="#6b7280"
-                    onPress={() => navigation.navigate('HistorialAccesos')}
+                    // ✅ Parámetros añadidos
+                    onPress={() => navigation.navigate('HistorialAccesos', { idUsuario, nombreUsuario, rol })}
                 />
 
             </ScrollView>
@@ -137,7 +139,7 @@ export default function Admin({ route, navigation }) {
 const styles = StyleSheet.create({
     contenedor: { 
         flex: 1, 
-        backgroundColor: '#f1f5f9', // Un fondo gris azulado claro muy elegante (Slate 100)
+        backgroundColor: '#f1f5f9', 
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -151,7 +153,7 @@ const styles = StyleSheet.create({
     titulo: { 
         fontSize: 24, 
         fontWeight: '800', 
-        color: '#0f172a', // Casi negro para alta legibilidad
+        color: '#0f172a', 
         letterSpacing: -0.5,
     },
     subtitulo: { 
@@ -177,7 +179,6 @@ const styles = StyleSheet.create({
         marginTop: 22,
         marginBottom: 10,
     },
-    /* === EL CAMBIO PRINCIPAL: LAS TARJETAS DE LOS BOTONES === */
     tarjetaBoton: { 
         backgroundColor: '#ffffff', 
         paddingVertical: 14, 
@@ -186,7 +187,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row', 
         alignItems: 'center', 
         marginBottom: 10,
-        // Sombras suaves de estilo minimalista
         elevation: 2, 
         shadowColor: '#0f172a', 
         shadowOffset: { width: 0, height: 1 },

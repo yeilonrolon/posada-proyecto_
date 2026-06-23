@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView } from 'react-native';
+import { 
+  StyleSheet, Text, View, TextInput, TouchableOpacity, 
+  ScrollView, Alert, SafeAreaView, ActivityIndicator, Keyboard 
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy'; 
 import * as MediaLibrary from 'expo-media-library';
-// Importamos íconos profesionales
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BASE_URL } from './apiConfig';
 
@@ -13,17 +15,20 @@ export default function PantallaQR({ navigation, route }) {
   const [ubicacion, setUbicacion] = useState('');
   const [frecuencia, setFrecuencia] = useState('90');
   const [qrGenerado, setQrGenerado] = useState(null);
+  const [cargando, setCargando] = useState(false);
   
   const qrRef = useRef(null);
   const API_URL = `${BASE_URL}/api/equipos`; 
 
+  // 1. Registrar Activo en la Base de Datos y preparar JSON para QR
   const manejarGenerarYGuardarBD = async () => {
     if (!nombreEquipo.trim() || !ubicacion.trim()) {
-      Alert.alert('Campos Incompletos', 'Por favor ingresa el nombre del equipo y su ubicación.');
-      return;
+      return Alert.alert('Campos Incompletos', 'Por favor ingresa el nombre del equipo y su ubicación.');
     }
 
+    Keyboard.dismiss();
     const diasFrecuencia = parseInt(frecuencia, 10);
+    setCargando(true);
 
     try {
       const respuesta = await fetch(API_URL, {
@@ -39,7 +44,7 @@ export default function PantallaQR({ navigation, route }) {
 
       const datosSrv = await respuesta.json();
 
-      if (respuesta.status === 201) {
+      if (respuesta.status === 201 && datosSrv.equipo) {
         const equipoReal = datosSrv.equipo;
         const datosParaQR = {
           id: equipoReal.id, 
@@ -51,6 +56,7 @@ export default function PantallaQR({ navigation, route }) {
         setQrGenerado(JSON.stringify(datosParaQR));
         Alert.alert('Éxito 🎉', `Equipo registrado correctamente con el ID: ${equipoReal.id}.`);
         
+        // Limpieza de campos del formulario
         setNombreEquipo('');
         setUbicacion('');
         setFrecuencia('90');
@@ -61,20 +67,21 @@ export default function PantallaQR({ navigation, route }) {
     } catch (error) {
       console.error('❌ Error en petición POST:', error);
       Alert.alert('Error de Red', 'No se pudo conectar con el backend de la Posada. Verifica tu red local.');
+    } finally {
+      setCargando(false);
     }
   };
 
+  // 2. Exportar el gráfico del código QR como imagen a la galería
   const descargarImagenQR = async () => {
     if (!qrRef.current) {
-      Alert.alert('Error', 'No se ha detectado el gráfico del QR.');
-      return;
+      return Alert.alert('Error', 'No se ha detectado el gráfico del QR.');
     }
 
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso requerido', 'Necesitamos acceso a la galería para guardar la etiqueta QR.');
-        return;
+        return Alert.alert('Permiso requerido', 'Necesitamos acceso a la galería para guardar la etiqueta QR.');
       }
 
       const obtenerBase64 = () => {
@@ -85,8 +92,7 @@ export default function PantallaQR({ navigation, route }) {
 
       const dataURL = await obtenerBase64();
       if (!dataURL) {
-        Alert.alert('Error', 'No se pudieron extraer los datos gráficos.');
-        return;
+        return Alert.alert('Error', 'No se pudieron extraer los datos gráficos.');
       }
 
       const nombreArchivo = `QR_Activo_${Date.now()}.png`;
@@ -117,6 +123,7 @@ export default function PantallaQR({ navigation, route }) {
             onChangeText={setNombreEquipo}
             placeholder="Ej. Aire Acondicionado Hab 102"
             placeholderTextColor="#94a3b8"
+            editable={!cargando}
           />
 
           <Text style={styles.label}>Ubicación dentro de la Posada</Text>
@@ -126,6 +133,7 @@ export default function PantallaQR({ navigation, route }) {
             onChangeText={setUbicacion}
             placeholder="Ej. Planta Alta - Pasillo"
             placeholderTextColor="#94a3b8"
+            editable={!cargando}
           />
 
           <Text style={styles.label}>Frecuencia de Mantenimiento (Días)</Text>
@@ -136,11 +144,23 @@ export default function PantallaQR({ navigation, route }) {
             keyboardType="numeric"
             placeholder="Ej. 90"
             placeholderTextColor="#94a3b8"
+            editable={!cargando}
           />
 
-          <TouchableOpacity style={styles.botonPrincipal} onPress={manejarGenerarYGuardarBD} activeOpacity={0.8}>
-            <MaterialCommunityIcons name="database-plus" size={20} color="#fff" style={styles.iconoBoton} />
-            <Text style={styles.textoBoton}>Registrar y Crear QR</Text>
+          <TouchableOpacity 
+            style={[styles.botonPrincipal, cargando && { backgroundColor: '#cbd5e1' }]} 
+            onPress={manejarGenerarYGuardarBD} 
+            disabled={cargando}
+            activeOpacity={0.8}
+          >
+            {cargando ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="database-plus" size={20} color="#fff" style={styles.iconoBoton} />
+                <Text style={styles.textoBoton}>Registrar y Crear QR</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -180,7 +200,7 @@ export default function PantallaQR({ navigation, route }) {
 
           <TouchableOpacity 
             style={[styles.botonMenu, { backgroundColor: '#ffffff', borderColor: '#475569', borderWidth: 1 }]} 
-            onPress={() => navigation.navigate('PantallaListaQR', idUsuario)}
+            onPress={() => navigation.navigate('PantallaListaQR', { idUsuario })}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="clipboard-text-multiple" size={19} color="#475569" style={styles.iconoBoton} />
@@ -193,145 +213,22 @@ export default function PantallaQR({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f1f5f9' // Mismo fondo Slate elegante del Dashboard
-  },
-  content: { 
-    paddingHorizontal: 20, 
-    paddingTop: 15,
-    paddingBottom: 40,
-    alignItems: 'center' 
-  },
-  subtitulo: { 
-    fontSize: 15, 
-    fontWeight: '700', 
-    color: '#475569', 
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 12, 
-    alignSelf: 'flex-start' 
-  },
-  formulario: { 
-    width: '100%', 
-    backgroundColor: '#fff', 
-    padding: 18, 
-    borderRadius: 16, 
-    elevation: 2, 
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    marginBottom: 20 
-  },
-  label: { 
-    fontSize: 13, 
-    color: '#334155', 
-    marginBottom: 6, 
-    fontWeight: '600' 
-  },
-  input: { 
-    width: '100%', 
-    height: 48, 
-    backgroundColor: '#f8fafc',
-    borderWidth: 1, 
-    borderColor: '#e2e8f0', 
-    borderRadius: 10, 
-    paddingHorizontal: 14, 
-    marginBottom: 16, 
-    color: '#0f172a',
-    fontSize: 14
-  },
-  botonPrincipal: { 
-    width: '100%', 
-    height: 48, 
-    backgroundColor: '#8b5cf6', // Color morado tecnológico acorde al Dashboard
-    borderRadius: 12, 
-    flexDirection: 'row',
-    alignItems: 'center', 
-    justifyContent: 'center',
-    marginTop: 4,
-    elevation: 1,
-  },
-  iconoBoton: {
-    marginRight: 8,
-  },
-  textoBoton: { 
-    color: '#fff', 
-    fontSize: 15, 
-    fontWeight: '600' 
-  },
-  /* === DISEÑO DE TARJETA QR MEJORADO === */
-  qrBox: { 
-    alignItems: 'center', 
-    backgroundColor: '#fff', 
-    padding: 20, 
-    borderRadius: 16, 
-    width: '100%', 
-    elevation: 2,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    marginBottom: 20 
-  },
-  qrBoxTitulo: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  qrContenedorGrafico: {
-    padding: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  infoQr: { 
-    fontSize: 12, 
-    color: '#64748b', 
-    marginTop: 12, 
-    textAlign: 'center',
-    fontWeight: '500'
-  },
-  botonDescargar: { 
-    marginTop: 14, 
-    backgroundColor: '#0f172a', // Botón oscuro minimalista
-    flexDirection: 'row',
-    paddingHorizontal: 18, 
-    paddingVertical: 11, 
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textoBotonDescargar: { 
-    color: '#fff', 
-    fontWeight: '600', 
-    fontSize: 13 
-  },
-  seccionAcciones: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 10,
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-  },
-  menuBotones: { 
-    width: '100%'
-  },
-  botonMenu: { 
-    width: '100%', 
-    height: 48, 
-    borderRadius: 12, 
-    flexDirection: 'row',
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    marginBottom: 10,
-  }
+  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  content: { paddingHorizontal: 20, paddingTop: 15, paddingBottom: 40, alignItems: 'center' },
+  subtitulo: { fontSize: 15, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, alignSelf: 'flex-start' },
+  formulario: { width: '100%', backgroundColor: '#fff', padding: 18, borderRadius: 16, elevation: 2, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, marginBottom: 20 },
+  label: { fontSize: 13, color: '#334155', marginBottom: 6, fontWeight: '600' },
+  input: { width: '100%', height: 48, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, paddingHorizontal: 14, marginBottom: 16, color: '#0f172a', fontSize: 14 },
+  botonPrincipal: { width: '100%', height: 48, backgroundColor: '#8b5cf6', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, elevation: 1 },
+  iconoBoton: { marginRight: 8 },
+  textoBoton: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  qrBox: { alignItems: 'center', backgroundColor: '#fff', padding: 20, borderRadius: 16, width: '100%', elevation: 2, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, marginBottom: 20 },
+  qrBoxTitulo: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.5 },
+  qrContenedorGrafico: { padding: 12, backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  infoQr: { fontSize: 12, color: '#64748b', marginTop: 12, textAlign: 'center', fontWeight: '500' },
+  botonDescargar: { marginTop: 14, backgroundColor: '#0f172a', flexDirection: 'row', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  textoBotonDescargar: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  seccionAcciones: { fontSize: 13, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 10, marginBottom: 10, alignSelf: 'flex-start' },
+  menuBotones: { width: '100%' },
+  botonMenu: { width: '100%', height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }
 });

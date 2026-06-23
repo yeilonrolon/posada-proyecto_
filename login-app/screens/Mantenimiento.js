@@ -9,9 +9,8 @@ import { shareAsync } from 'expo-sharing';
 import { BASE_URL } from './apiConfig';
 
 export default function Mantenimiento({ navigation, route }) {
-    // Configuración de conexión (Asegúrate de que la IP sea la de tu Linux Lite)
     const API_URL = BASE_URL;
-    const { idUsuario, nombreUsuario } = route.params || {};
+    const { idUsuario = null, nombreUsuario = 'Operador' } = route.params || {};
     
     const [gastos, setGastos] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -45,16 +44,16 @@ export default function Mantenimiento({ navigation, route }) {
 
     const cargarDatos = useCallback(async () => {
         try {
-            // 1. Obtener Historial
-            const resGastos = await axios.get(`${API_URL}/listagastos`, {}, { timeout: 6000 });
-            if (resGastos.data.success) {
+            // 1. Obtener Historial (CORRECCIÓN: Eliminado objeto vacío central)
+            const resGastos = await axios.get(`${API_URL}/listagastos`, { timeout: 6000 });
+            if (resGastos.data.success && Array.isArray(resGastos.data.datos)) {
                 setGastos(resGastos.data.datos);
             }
 
-            // 2. Verificar fechas (en bloque separado para no romper la lista si falla)
+            // 2. Verificar fechas de forma segura (CORRECCIÓN: Eliminado objeto vacío central)
             try {
-                const resFechas = await axios.get(`${API_URL}/verificarfecha`, {}, { timeout: 4000 });
-                if (resFechas.data.success) {
+                const resFechas = await axios.get(`${API_URL}/verificarfecha`, { timeout: 4000 });
+                if (resFechas.data.success && Array.isArray(resFechas.data.datos)) {
                     verificarAntiguedad(resFechas.data.datos);
                 }
             } catch (e) {
@@ -68,7 +67,7 @@ export default function Mantenimiento({ navigation, route }) {
             setCargando(false);
             setRefreshing(false);
         }
-    }, [verificarAntiguedad]);
+    }, [API_URL, verificarAntiguedad]);
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
@@ -151,7 +150,9 @@ export default function Mantenimiento({ navigation, route }) {
             </View>
             <View style={styles.divisor} />
             <View style={styles.cardBody}>
-                <Text style={styles.valorTexto}>{item.lectura_valor} <Text style={styles.unidad}>{item.tipo === 'Agua' ? 'M3' : 'KWH'}</Text></Text>
+                <Text style={styles.valorTexto}>
+                    {item.lectura_valor} <Text style={styles.unidad}>{item.tipo === 'Agua' ? 'M3' : 'KWH'}</Text>
+                </Text>
                 <Text style={styles.usuarioTexto}>Registrado por: {item.nombre}</Text>
             </View>
         </View>
@@ -161,10 +162,9 @@ export default function Mantenimiento({ navigation, route }) {
         <View style={styles.contenedorPrincipal}>
             <View style={styles.headerTop}>
                 <Text style={styles.tituloHeader}>Mantenimiento</Text>
-                <Text style={styles.operadorHeader}>👤 {nombreUsuario || 'Operador'}</Text>
+                <Text style={styles.operadorHeader}>👤 {nombreUsuario}</Text>
             </View>
 
-            {/* BOTÓN RESTAURADO PARA NUEVO REGISTRO */}
             <TouchableOpacity 
                 style={styles.botonNuevo} 
                 activeOpacity={0.7}
@@ -179,7 +179,9 @@ export default function Mantenimiento({ navigation, route }) {
                 onPress={generarPdfGastos}
                 disabled={generandoPdf}
             >
-                <Text style={styles.textoBotonNuevo}>{generandoPdf ? 'Generando PDF...' : '📄 GENERAR PDF'}</Text>
+                <Text style={styles.textoBotonNuevo}>
+                    {generandoPdf ? 'Generando PDF...' : '📄 GENERAR PDF'}
+                </Text>
             </TouchableOpacity>
 
             <Text style={styles.tituloSeccion}>Historial de Consumo</Text>
@@ -191,7 +193,12 @@ export default function Mantenimiento({ navigation, route }) {
                     data={gastos}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderGasto}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); cargarDatos(); }} />}
+                    refreshControl={
+                        <RefreshControl 
+                            refreshing={refreshing} 
+                            onRefresh={() => { setRefreshing(true); cargarDatos(); }} 
+                        />
+                    }
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={<Text style={styles.emptyText}>No hay registros guardados.</Text>}
                 />
@@ -206,24 +213,23 @@ const styles = StyleSheet.create({
     tituloHeader: { fontSize: 22, fontWeight: 'bold', color: '#1E293B' },
     operadorHeader: { fontSize: 13, color: '#64748B', backgroundColor: '#E2E8F0', padding: 5, borderRadius: 10 },
     
-    // Estilo del botón restaurado
     botonNuevo: { 
         backgroundColor: '#525FE1', 
         paddingVertical: 15, 
         borderRadius: 15, 
         alignItems: 'center', 
         elevation: 4,
-        marginBottom: 25 
+        marginBottom: 15 // Reducido un poco para balancear con el botón de PDF
     },
     textoBotonNuevo: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
-    botonPdf: { backgroundColor: '#10B981' },
+    botonPdf: { backgroundColor: '#10B981', marginBottom: 25 },
     
     tituloSeccion: { fontSize: 14, fontWeight: 'bold', color: '#94A3B8', marginBottom: 15, textTransform: 'uppercase' },
     card: { backgroundColor: '#FFF', borderRadius: 15, padding: 15, marginBottom: 12, elevation: 2 },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     tipoTexto: { fontSize: 16, fontWeight: 'bold', color: '#334155' },
     fechaTexto: { fontSize: 12, color: '#94A3B8' },
-    divisor: { height: 1, backgroundColor: '#F1F5F9', my: 10, marginVertical: 10 },
+    divisor: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 10 }, // CORRECCIÓN: Eliminada la propiedad residual 'my: 10'
     valorTexto: { fontSize: 20, fontWeight: 'bold', color: '#525FE1' },
     unidad: { fontSize: 12, color: '#94A3B8' },
     usuarioTexto: { fontSize: 11, color: '#64748B', marginTop: 5 },

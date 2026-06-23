@@ -160,4 +160,33 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// ===================================================
+// NUEVO ENDPOINT: OBTENER UN EQUIPO POR SU ID (SELECT INDIVIDUAL)
+// ===================================================
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const consultaSQL = `
+            SELECT 
+                e.*, 
+                u.nombre AS nombre_usuario
+            FROM equipos_qr e
+            LEFT JOIN usuarios u ON e.revisado_por = u.id
+            WHERE e.id = $1;
+        `;
+
+        const resultado = await pool.query(consultaSQL, [parseInt(id, 10)]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Equipo no encontrado en el sistema.' });
+        }
+
+        // Retornamos los datos del equipo encontrado en la propiedad '.datos'
+        res.json({ success: true, datos: resultado.rows[0] });
+    } catch (error) {
+        console.error('❌ Error al obtener equipo por ID:', error.message);
+        res.status(500).json({ success: false, error: 'Error interno al consultar el activo.' });
+    }
+});
+
 module.exports = router;

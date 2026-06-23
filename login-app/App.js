@@ -28,35 +28,38 @@ import qr from './screens/qr';
 
 const Stack = createStackNavigator();
 
+// ✅ Extraemos la configuración para evitar re-crearla en cada re-render
+const getScreenOptions = (navigation) => ({
+  headerTintColor: 'white',
+  headerTitleAlign: 'center', 
+  headerStyle: { 
+    backgroundColor: '#525FE1',
+    elevation: 0, 
+    shadowOpacity: 0, 
+  },
+  headerTitleStyle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  headerRight: () => (
+    <TouchableOpacity 
+      onPress={() => navigation.replace('Login')}
+      style={styles.btnLogout}
+    >
+      <Text style={styles.btnLogoutText}>Salir</Text>
+    </TouchableOpacity>
+  ),
+});
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator 
           initialRouteName="Login"
-          screenOptions={({ navigation }) => ({
-            headerTintColor: 'white',
-            headerTitleAlign: 'center', // Centra los títulos en Android también
-            headerStyle: { 
-              backgroundColor: '#525FE1',
-              elevation: 0, // Quita sombra en Android
-              shadowOpacity: 0, // Quita sombra en iOS
-            },
-            headerTitleStyle: {
-              fontWeight: 'bold',
-              fontSize: 16,
-              letterSpacing: 0.5,
-            },
-            // Botón global de Cerrar Sesión para pantallas principales
-            headerRight: () => (
-              <TouchableOpacity 
-                onPress={() => navigation.replace('Login')}
-                style={styles.btnLogout}
-              >
-                <Text style={styles.btnLogoutText}>Salir</Text>
-              </TouchableOpacity>
-            ),
-          })}
+          // ✅ Pasamos la referencia de navegación de manera limpia
+          screenOptions={({ navigation }) => getScreenOptions(navigation)}
         >
           {/* Módulo de Acceso */}
           <Stack.Screen 
@@ -119,30 +122,30 @@ export default function App() {
           <Stack.Screen 
             name="RegistroEstadoBano"
             component={RegistroEstadoBano}
-            options={{title: 'REGISTRO ESTADOS DE BAÑOS', headerRight:null}}
+            options={{ title: 'REGISTRO ESTADOS DE BAÑOS', headerRight: null }}
           />
           <Stack.Screen 
             name="EstadoBano"
             component={EstadoBano}
-            options={{title: 'ESTADOS DE BAÑOS', headerRight:null}}
+            options={{ title: 'ESTADOS DE BAÑOS', headerRight: null }}
           />
           <Stack.Screen 
             name="Habitaciones"
             component={Habitaciones}
-            options={{title: 'ESTADOS DE HABITACIONES', headerRight:null}}
+            options={{ title: 'ESTADOS DE HABITACIONES', headerRight: null }}
           />
           <Stack.Screen 
             name="MenuInferior"
             component={MenuInferior}
-            options={{ headerShown: false}}
+            options={{ headerShown: false }}
           />
           <Stack.Screen 
-          name="RecuperacionClave"
-          component={RecuperacionClave}
-          options={{ 
-            title: 'RECUPERACIÓN DE CLAVE', 
-            headerRight: null 
-          }}
+            name="RecuperacionClave"
+            component={RecuperacionClave}
+            options={{ 
+              title: 'RECUPERACIÓN DE CLAVE', 
+              headerRight: null 
+            }}
           />
           <Stack.Screen 
             name="RegistroCosto" 
@@ -155,20 +158,20 @@ export default function App() {
             options={{ title: 'HISTORIAL DE COSTOS DE REPARACION', headerRight: null }}
           />
           <Stack.Screen 
-          name="PantallaCamara" 
-          component={PantallaCamara} 
-          options={{ title: 'Cámara QR' }} 
-        />
-        <Stack.Screen 
-          name="PantallaListaQR" 
-          component={PantallaListaQR} 
-          options={{ title: 'Lista de QR' }} 
-        />
-        <Stack.Screen 
-          name="qr" 
-          component={qr} 
-          options={{ title: 'Control de Activos QR' }} 
-        />
+            name="PantallaCamara" 
+            component={PantallaCamara} 
+            options={{ title: 'Cámara QR' }} 
+          />
+          <Stack.Screen 
+            name="PantallaListaQR" 
+            component={PantallaListaQR} 
+            options={{ title: 'Lista de QR' }} 
+          />
+          <Stack.Screen 
+            name="qr" 
+            component={qr} 
+            options={{ title: 'Control de Activos QR' }} 
+          />
 
         </Stack.Navigator>
         <StatusBar style="light" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
     View, 
     TextInput, 
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import * as LocalAuthentication from 'expo-local-authentication'; // 👈 1. Importamos la librería
+import * as LocalAuthentication from 'expo-local-authentication'; 
 import { BASE_URL } from './apiConfig';
 
 export default function Login({ navigation }) {
@@ -25,34 +25,37 @@ export default function Login({ navigation }) {
 
     const API_URL = BASE_URL;
 
-    // 👈 2. Función dedicada a validar la huella tras el éxito del Backend
-    const autenticarBiometria = async (params) => {
+    // Función auxiliar para manejar la navegación limpia
+    const redirigirSegunRol = useCallback((params) => {
+        setIntentosMsg('');
+        if (params.rol && params.rol.toLowerCase() === 'admin') {
+            params.rol = "Admin"; 
+            navigation.replace('Admin', params);
+        } else {
+            navigation.replace('MenuInferior', params);
+        }
+    }, [navigation]);
+
+    // Función dedicada a validar la huella/biometría tras el éxito del Backend
+    const autenticarBiometria = useCallback(async (params) => {
         try {
-            // Verificamos si el dispositivo tiene hardware biométrico (Lector de huellas/rostro)
             const tieneHardware = await LocalAuthentication.hasHardwareAsync();
-            // Verificamos si hay huellas guardadas en el celular
             const tieneHuellasRegistradas = await LocalAuthentication.isEnrolledAsync();
 
             if (!tieneHardware || !tieneHuellasRegistradas) {
-                // Si el dispositivo no tiene seguridad biométrica configurada,
-                // puedes decidir si dejarlo pasar directo o exigirle que configure una.
-                // Para sistemas seguros, lo ideal es dejarlo pasar pero advertir, o saltar directo.
                 redirigirSegunRol(params);
                 return;
             }
 
-            // Invocar el lector de huellas nativo
             const resultado = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Verificación Biométrica Requerida',
                 cancelLabel: 'Cancelar',
-                disableDeviceFallback: true, // Evita que use el PIN del teléfono si falla la huella
+                disableDeviceFallback: true, 
             });
 
             if (resultado.success) {
-                // 🟢 HUELLA CORRECTA (Existe en el dispositivo)
                 redirigirSegunRol(params);
             } else {
-                // 🔴 HUELLA INCORRECTA O CANCELADO
                 Alert.alert(
                     "Autenticación Fallida", 
                     "La huella no coincide con los registros del dispositivo o la operación fue cancelada."
@@ -62,18 +65,7 @@ export default function Login({ navigation }) {
             console.error("Error en Biometría:", error);
             Alert.alert("Error", "Ocurrió un error al intentar validar tu huella.");
         }
-    };
-
-    // 👈 3. Función auxiliar para manejar la navegación limpia
-    const redirigirSegunRol = (params) => {
-        setIntentosMsg('');
-        if (params.rol && params.rol.toLowerCase() === 'admin') {
-            params.rol = "Admin"; 
-            navigation.replace('Admin', params);
-        } else {
-            navigation.replace('MenuInferior', params);
-        }
-    };
+    }, [redirigirSegunRol]);
 
     const handleLogin = async () => {
         if (!usuario.trim() || !clave.trim()) {
@@ -93,12 +85,10 @@ export default function Login({ navigation }) {
                 const { id_usuario, rol, nombre } = res.data;
                 const params = { idUsuario: id_usuario, nombreUsuario: nombre, rol: rol };
                 
-                // 👈 4. Detenemos la carga y llamamos a la verificación por huella antes de pasar
                 setCargando(false); 
                 await autenticarBiometria(params);
 
             } else {
-                // SINCRONIZACIÓN CON TU BACKEND:
                 if (res.data.bloqueado) {
                     setIntentosMsg("CUENTA BLOQUEADA");
                     Alert.alert("Cuenta Bloqueada", res.data.mensaje);
@@ -172,14 +162,19 @@ export default function Login({ navigation }) {
                             />
                         </View>
 
-                        {/* ALERTA DINÁMICA */}
+                        {/* ALERTA DINÁMICA DE INTENTOS */}
                         {intentosMsg ? (
-                            <Text style={[
-                                styles.intentosTexto, 
-                                intentosMsg === "CUENTA BLOQUEADA" ? styles.textoBloqueado : styles.textoAdvertencia
+                            <View style={[
+                                styles.contenedorIntentos, 
+                                intentosMsg === "CUENTA BLOQUEADA" ? styles.bgBloqueado : styles.bgAdvertencia
                             ]}>
-                                {intentosMsg}
-                            </Text>
+                                <Text style={[
+                                    styles.intentosTexto, 
+                                    intentosMsg === "CUENTA BLOQUEADA" ? styles.textoBloqueado : styles.textoAdvertencia
+                                ]}>
+                                    {intentosMsg}
+                                </Text>
+                            </View>
                         ) : null}
 
                         {/* BOTÓN DE ¿OLVIDÓ SU CONTRASEÑA? */}
@@ -224,9 +219,15 @@ const styles = StyleSheet.create({
     inputGroup: { marginBottom: 18 },
     label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 6, marginLeft: 4 },
     input: { width: '100%', padding: 15, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1.5, borderColor: '#e2e8f0', fontSize: 16, color: '#1e293b' },
-    intentosTexto: { fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 16, paddingVertical: 8, borderRadius: 10, letterSpacing: 0.5, overflow: 'hidden' },
-    textoAdvertencia: { color: '#b45309', backgroundColor: '#fef3c7' },
-    textoBloqueado: { color: '#b91c1c', backgroundColor: '#fee2e2' },
+    
+    // Contenedor para mitigar problemas con estilos de caja directos en Text
+    contenedorIntentos: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
+    intentosTexto: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center' },
+    bgAdvertencia: { backgroundColor: '#fef3c7' },
+    bgBloqueado: { backgroundColor: '#fee2e2' },
+    textoAdvertencia: { color: '#b45309' },
+    textoBloqueado: { color: '#b91c1c' },
+    
     olvidoContainer: { alignSelf: 'flex-start', marginBottom: 24, marginLeft: 4 },
     olvidoTexto: { color: '#3b82f6', fontSize: 14, fontWeight: '500' },
     btn: { backgroundColor: '#525FE1', padding: 18, borderRadius: 14, marginTop: 10, alignItems: 'center' },

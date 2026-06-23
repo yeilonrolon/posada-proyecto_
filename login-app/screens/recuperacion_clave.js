@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { 
     View, TextInput, TouchableOpacity, Text, Alert, StyleSheet, 
-    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator
+    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import { BASE_URL } from './apiConfig'; // Ajusta la ruta según tu carpeta
+import { BASE_URL } from './apiConfig';
 
+/**
+ * PANTALLA: RECUPERACIÓN DE CONTRASEÑA
+ * Flujo lógico secuencial de 3 pasos integrado en una sola tarjeta visual.
+ */
 export default function RecuperacionClave({ navigation }) {
-    const [paso, setPaso] = useState(1); // Maneja las 3 pantallas lógicas
+    const [paso, setPaso] = useState(1); 
     const [cargando, setCargando] = useState(false);
 
     // --- ESTADOS PASO 1: Identificación ---
@@ -32,7 +36,7 @@ export default function RecuperacionClave({ navigation }) {
         especial: false,
     });
 
-    // Escucha cambios en la nueva clave para activar los checks en tiempo real
+    // Validación reactiva de la nueva contraseña
     useEffect(() => {
         setValidaciones({
             longitud: nuevaClave.length >= 6 && nuevaClave.length <= 8,
@@ -47,69 +51,66 @@ export default function RecuperacionClave({ navigation }) {
 
     // --- FUNCIONES DE FLUJO ---
 
-    // 1. Verificar si el usuario existe y extraer sus preguntas
+    // 1. Verificar existencia del usuario
     const verificarUsuario = async () => {
         if (!usuario.trim()) {
             return Alert.alert("Atención", "Por favor, ingresa tu usuario.");
         }
 
+        Keyboard.dismiss();
         setCargando(true);
         try {
-            // Pasamos el usuario a minúsculas para coincidir con la BD homogénea
             const res = await axios.post(`${BASE_URL}/verificar-usuario-recuperacion`, {
                 usuario: usuario.trim().toLowerCase()
-            });
+            }, { timeout: 6000 });
 
-            if (res.data.success) {
+            if (res.data && res.data.success) {
                 const { id, pregunta1, pregunta2 } = res.data.datos;
                 
-                // ⚠️ Guardamos los datos devueltos en los estados correspondientes
                 setIdUsuario(id);
                 setPregunta1(pregunta1);
                 setPregunta2(pregunta2);
-                
-                // Avanzamos al paso 2 eliminando el contenido anterior de la vista
                 setPaso(2); 
             } else {
-                Alert.alert("Error", res.data.mensaje || "El usuario no existe.");
+                Alert.alert("Aviso", res.data.mensaje || "El usuario ingresado no existe.");
             }
         } catch (error) {
             console.log("Error verificando usuario:", error.message);
-            Alert.alert("Error de Red", "No se pudo conectar con el servidor.");
+            Alert.alert("Error de Red", "No se pudo conectar con el servidor local.");
         } finally {
             setCargando(false);
         }
     };
 
-    // 2. Verificar respuestas de seguridad
+    // 2. Validar respuestas de seguridad
     const verificarRespuestas = async () => {
         if (!respuesta1.trim() || !respuesta2.trim()) {
             return Alert.alert("Atención", "Por favor, responde ambas preguntas.");
         }
 
+        Keyboard.dismiss();
         setCargando(true);
         try {
             const res = await axios.post(`${BASE_URL}/verificar-respuestas`, {
                 id: idUsuario,
                 respuesta1: respuesta1.trim().toLowerCase(),
                 respuesta2: respuesta2.trim().toLowerCase()
-            });
+            }, { timeout: 6000 });
 
-            if (res.data.success) {
-                // Si las respuestas coinciden, pasamos al paso final
+            if (res.data && res.data.success) {
                 setPaso(3);
             } else {
                 Alert.alert("Validación Fallida", res.data.mensaje || "Respuestas incorrectas.");
             }
         } catch (error) {
             console.log("Error verificando respuestas:", error.message);
-            Alert.alert("Error de Red", "Ocurrió un problema al validar.");
+            Alert.alert("Error de Red", "Ocurrió un problema al validar las respuestas.");
         } finally {
             setCargando(false);
         }
     };
 
-    // 3. Cambiar clave definitiva
+    // 3. Modificación final de contraseña
     const cambiarContrasena = async () => {
         if (!nuevaClave || !confirmarClave) {
             return Alert.alert("Atención", "Completa ambos campos de contraseña.");
@@ -121,29 +122,29 @@ export default function RecuperacionClave({ navigation }) {
             return Alert.alert("Atención", "Las contraseñas no coinciden.");
         }
 
+        Keyboard.dismiss();
         setCargando(true);
         try {
             const res = await axios.post(`${BASE_URL}/actualizar-clave-recuperacion`, {
                 id: idUsuario,
                 nuevaClave: nuevaClave
-            });
+            }, { timeout: 6000 });
 
-            if (res.data.success) {
+            if (res.data && res.data.success) {
                 Alert.alert("¡Éxito!", "Tu contraseña ha sido cambiada correctamente.", [
-                    { text: "OK", onPress: () => navigation.replace('Login') } // 🟢 Redirecciona de una al Login
+                    { text: "OK", onPress: () => navigation.replace('Login') }
                 ]);
             } else {
                 Alert.alert("Error", res.data.mensaje || "No se pudo actualizar la contraseña.");
             }
         } catch (error) {
             console.log("Error actualizando clave:", error.message);
-            Alert.alert("Error de Red", "No se guardaron los cambios.");
+            Alert.alert("Error de Red", "No se guardaron los cambios en la base de datos.");
         } finally {
             setCargando(false);
         }
     };
 
-    // Componente interno para mostrar los requisitos visuales en el Paso 3
     const Requisito = ({ cumplido, texto }) => (
         <View style={styles.requisitoItem}>
             <Text style={{ fontSize: 10 }}>{cumplido ? '✅' : '⚪'}</Text>
@@ -162,6 +163,7 @@ export default function RecuperacionClave({ navigation }) {
                 <ScrollView 
                     contentContainerStyle={styles.scrollContent} 
                     keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.card}>
                         
@@ -174,12 +176,13 @@ export default function RecuperacionClave({ navigation }) {
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Usuario</Text>
                                     <TextInput 
-                                        placeholder="Ejemplo: Usuario..." 
-                                        placeholderTextColor="#cbd5e1"
+                                        placeholder="Ejemplo: jperez_villa" 
+                                        placeholderTextColor="#94a3b8"
                                         onChangeText={setUsuario}
                                         value={usuario}
                                         style={styles.input}
                                         autoCapitalize="none"
+                                        autoCorrect={false}
                                         editable={!cargando}
                                     />
                                 </View>
@@ -188,6 +191,7 @@ export default function RecuperacionClave({ navigation }) {
                                     onPress={verificarUsuario}
                                     style={[styles.btn, !usuario.trim() && styles.btnDesactivado]}
                                     disabled={cargando || !usuario.trim()}
+                                    activeOpacity={0.8}
                                 >
                                     {cargando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>VERIFICAR CUENTA</Text>}
                                 </TouchableOpacity>
@@ -205,23 +209,27 @@ export default function RecuperacionClave({ navigation }) {
                                     <Text style={styles.labelPregunta}>1. {pregunta1 || "Cargando pregunta..."}</Text>
                                     <TextInput 
                                         placeholder="Tu respuesta aquí" 
-                                        placeholderTextColor="#cbd5e1"
+                                        placeholderTextColor="#94a3b8"
                                         onChangeText={setRespuesta1}
                                         value={respuesta1}
                                         style={styles.input}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
                                         editable={!cargando}
                                     />
                                 </View>
 
                                 {/* Pregunta 2 */}
-                                <View style={[styles.inputGroup, { marginTop: 12 }]}>
+                                <View style={[styles.inputGroup, { marginTop: 14 }]}>
                                     <Text style={styles.labelPregunta}>2. {pregunta2 || "Cargando pregunta..."}</Text>
                                     <TextInput 
                                         placeholder="Tu respuesta aquí" 
-                                        placeholderTextColor="#cbd5e1"
+                                        placeholderTextColor="#94a3b8"
                                         onChangeText={setRespuesta2}
                                         value={respuesta2}
                                         style={styles.input}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
                                         editable={!cargando}
                                     />
                                 </View>
@@ -230,6 +238,7 @@ export default function RecuperacionClave({ navigation }) {
                                     onPress={verificarRespuestas}
                                     style={[styles.btn, (!respuesta1.trim() || !respuesta2.trim()) && styles.btnDesactivado]}
                                     disabled={cargando || !respuesta1.trim() || !respuesta2.trim()}
+                                    activeOpacity={0.8}
                                 >
                                     {cargando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>VALIDAR RESPUESTAS</Text>}
                                 </TouchableOpacity>
@@ -247,32 +256,34 @@ export default function RecuperacionClave({ navigation }) {
                                     <Text style={styles.label}>Contraseña Nueva</Text>
                                     <TextInput 
                                         placeholder="••••••••" 
-                                        placeholderTextColor="#cbd5e1"
+                                        placeholderTextColor="#94a3b8"
                                         secureTextEntry
                                         onChangeText={setNuevaClave}
                                         value={nuevaClave}
                                         style={styles.input}
                                         maxLength={8}
+                                        autoCapitalize="none"
                                         editable={!cargando}
                                     />
                                 </View>
 
                                 {/* Input: Confirmar Clave */}
-                                <View style={[styles.inputGroup, { marginTop: 12 }]}>
+                                <View style={[styles.inputGroup, { marginTop: 14 }]}>
                                     <Text style={styles.label}>Confirmar Contraseña</Text>
-                                    <TextInput z
+                                    <TextInput 
                                         placeholder="••••••••" 
-                                        placeholderTextColor="#cbd5e1"
+                                        placeholderTextColor="#94a3b8"
                                         secureTextEntry
                                         onChangeText={setConfirmarClave}
                                         value={confirmarClave}
                                         style={styles.input}
                                         maxLength={8}
+                                        autoCapitalize="none"
                                         editable={!cargando}
                                     />
                                 </View>
 
-                                {/* Panel de Requisitos visuales */}
+                                {/* Panel de Requisitos */}
                                 <View style={styles.containerValidaciones}>
                                     <View style={styles.valRow}>
                                         <Requisito cumplido={validaciones.longitud} texto="6-8 caracteres" />
@@ -291,6 +302,7 @@ export default function RecuperacionClave({ navigation }) {
                                     onPress={cambiarContrasena}
                                     style={[styles.btn, (!todoValido || nuevaClave !== confirmarClave) && styles.btnDesactivado]}
                                     disabled={cargando || !todoValido || nuevaClave !== confirmarClave}
+                                    activeOpacity={0.8}
                                 >
                                     {cargando ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>REESTABLECER CONTRASEÑA</Text>}
                                 </TouchableOpacity>

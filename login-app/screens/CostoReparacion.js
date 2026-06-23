@@ -9,7 +9,8 @@ import { BASE_URL } from './apiConfig';
 export default function CostoReparacion({ navigation, route }) {
     
     const API_URL = BASE_URL;
-    const { idUsuario, nombreUsuario, rol } = route.params || {};
+    // Fallback preventivo si route.params es undefined
+    const { idUsuario = null, nombreUsuario = 'Operador', rol = 'User' } = route.params || {};
     
     const [habitaciones, setHabitaciones] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -24,10 +25,10 @@ export default function CostoReparacion({ navigation, route }) {
         setModalVisible(true);
     };
 
+    // CORRECCIÓN: Se agregó el array de dependencias vacío [] para estabilizar el useCallback
     const cargarDatos = useCallback(async () => {
         try {
-            // 1. Obtener Historial
-            const resCostos = await axios.get(`${API_URL}/listar-costo-reparacion`,  { timeout: 6000 });
+            const resCostos = await axios.get(`${API_URL}/listar-costo-reparacion`, { timeout: 6000 });
             if (resCostos.data.success && Array.isArray(resCostos.data.habitacion)) {
                 setHabitaciones(resCostos.data.habitacion);
                 if (resCostos.data.habitacion.length === 0) {
@@ -47,7 +48,7 @@ export default function CostoReparacion({ navigation, route }) {
             setCargando(false);
             setRefreshing(false);
         }
-    });
+    }, [API_URL]); 
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
@@ -57,6 +58,7 @@ export default function CostoReparacion({ navigation, route }) {
 
         return unsubscribe;
     }, [navigation, cargarDatos]);
+
     const botonEliminar = (idCosto) => {
         Alert.alert(
             '🚨 ¿Eliminar Registro?',
@@ -85,13 +87,13 @@ export default function CostoReparacion({ navigation, route }) {
         <View style={styles.card}>
             <View style={[styles.cardHeader, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                 <Text style={styles.habitacionTexto}> Ubicación: {item.ubicacion}</Text>
-                {rol == "Admin" && (
-                <TouchableOpacity 
-                    onPress={() => botonEliminar(item.id_costo)} 
-                    style={{ padding: 6 }}
-                >
-                    <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 14 }}>Eliminar</Text>
-                </TouchableOpacity>
+                {rol === "Admin" && (
+                    <TouchableOpacity 
+                        onPress={() => botonEliminar(item.id_costo)} 
+                        style={{ padding: 6 }}
+                    >
+                        <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 14 }}>Eliminar</Text>
+                    </TouchableOpacity>
                 )}
             </View>
             
@@ -109,49 +111,50 @@ export default function CostoReparacion({ navigation, route }) {
                 <Text style={styles.usuarioTexto}>Materiales: {item.materiales}</Text>
                 <Text style={styles.usuarioTexto}>Costo total: {item.costo_final}</Text>
                 <Text style={styles.usuarioTexto}>Registrado por: {item.registrado_por}</Text>
+                
                 <View style={{ flexDirection: 'row', marginTop: 12, gap: 10 }}>
-                    
                     <TouchableOpacity 
                         onPress={() => detalles(item)} 
                         activeOpacity={0.8}
-                        style={{flex: 1,backgroundColor: '#E2E8F0', paddingVertical: 10,borderRadius: 6,alignItems: 'center',justifyContent: 'center'}}>
+                        style={{flex: 1, backgroundColor: '#E2E8F0', paddingVertical: 10, borderRadius: 6, alignItems: 'center', justifyContent: 'center'}}
+                    >
                         <Text style={{ color: '#334155', fontWeight: '600', fontSize: 14 }}>Detalles</Text>
                     </TouchableOpacity>
                     
-                    {rol == "Admin" && (
-                    <TouchableOpacity 
-                        onPress={() => navigation.navigate('RegistroCosto', { idUsuario, item })} 
-                        style={{flex: 1,backgroundColor: '#525FE1', paddingVertical: 10,borderRadius: 6,alignItems: 'center',justifyContent: 'center'}}>
-                        <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 14 }}>Editar</Text>
-                    </TouchableOpacity>
+                    {rol === "Admin" && (
+                        <TouchableOpacity 
+                            onPress={() => navigation.navigate('RegistroCosto', { idUsuario, item })} 
+                            style={{flex: 1, backgroundColor: '#525FE1', paddingVertical: 10, borderRadius: 6, alignItems: 'center', justifyContent: 'center'}}
+                        >
+                            <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 14 }}>Editar</Text>
+                        </TouchableOpacity>
                     )}
-                    
                 </View>
             </View>
         </View>
     );
 
     return (
-        
         <View style={styles.contenedorPrincipal}>
             <View style={styles.headerTop}>
                 <Text style={styles.tituloHeader}>Registro de costos extras</Text>
-                <Text style={styles.operadorHeader}>👤 {nombreUsuario || 'Operador'}</Text>
+                <Text style={styles.operadorHeader}>👤 {nombreUsuario}</Text>
             </View>
-
 
             <Text style={styles.tituloSeccion}>Informacion Costos extras</Text>
             <View style={styles.cardReportePdf}>
                 <Text style={styles.subtituloCard}>Registro de Costos</Text>
                 <Text style={styles.label}>Aquí puedes ver los costos extras registrados y agregar nuevos elementos.</Text>
             </View>
+
             <TouchableOpacity 
-                            style={styles.botonNuevo} 
-                            activeOpacity={0.7}
-                            onPress={() => navigation.navigate('RegistroCosto', { idUsuario, nombreUsuario })}
-                        >
-                            <Text style={styles.textoBotonNuevo}>➕ NUEVO COSTO EXTRA</Text>
+                style={styles.botonNuevo} 
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('RegistroCosto', { idUsuario, nombreUsuario })}
+            >
+                <Text style={styles.textoBotonNuevo}>➕ NUEVO COSTO EXTRA</Text>
             </TouchableOpacity>
+
             {cargando && !refreshing ? (
                 <ActivityIndicator size="large" color="#525FE1" style={{ marginTop: 30 }} />
             ) : (
@@ -159,16 +162,24 @@ export default function CostoReparacion({ navigation, route }) {
                     data={habitaciones}
                     keyExtractor={(item) => item.id_costo.toString()}
                     renderItem={renderCostos}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); cargarDatos(); }} />}
+                    refreshControl={
+                        <RefreshControl 
+                            refreshing={refreshing} 
+                            onRefresh={() => { setRefreshing(true); cargarDatos(); }} 
+                        />
+                    }
                     contentContainerStyle={{ paddingBottom: 20 }}
                     ListEmptyComponent={<Text style={styles.emptyText}>No hay registros guardados.</Text>}
                 />
             )}
+
+            {/* Modal de Detalles */}
             <Modal
                 animationType="slide"
                 transparent={true}
                 visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}>
+                onRequestClose={() => setModalVisible(false)}
+            >
                 <View style={styles.modalCentrado}>
                     <View style={styles.contenidoModal}>
                         <ScrollView 
@@ -199,24 +210,24 @@ export default function CostoReparacion({ navigation, route }) {
                                 </View>
                             )}
 
-                            
                             <TouchableOpacity 
                                 style={styles.botonCerrarModal} 
                                 onPress={() => setModalVisible(false)}
                             >
                                 <Text style={styles.textoBotonCerrar}>Volver Atrás</Text>
                             </TouchableOpacity>
-
                         </ScrollView>
                     </View>
                 </View>
             </Modal>
 
+            {/* Modal de Error/Informativo */}
             <Modal
                 animationType="fade"
                 transparent={true}
                 visible={errorModalVisible}
-                onRequestClose={() => setErrorModalVisible(false)}>
+                onRequestClose={() => setErrorModalVisible(false)}
+            >
                 <View style={styles.modalCentrado}>
                     <View style={styles.contenidoModal}>
                         <Text style={styles.modalTitulo}>⚠️ Atención</Text>
@@ -231,9 +242,9 @@ export default function CostoReparacion({ navigation, route }) {
                 </View>
             </Modal>
         </View>
-        
     );
 }
+
 const styles = StyleSheet.create({
     contenedorPrincipal: { flex: 1, backgroundColor: '#F8FAFC', paddingHorizontal: 20 },
     headerTop: { marginTop: 20, marginBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -255,18 +266,15 @@ const styles = StyleSheet.create({
     card: { backgroundColor: '#FFF', borderRadius: 15, padding: 15, marginBottom: 12, elevation: 2 },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     habitacionTexto: { fontSize: 16, fontWeight: 'bold', color: '#334155' },
-    fechaTexto: { fontSize: 12, color: '#94A3B8' },
     divisor: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 10 },
     estadoTexto: { fontSize: 20, fontWeight: 'bold', color: '#525FE1' },
-    observacionTexto: { fontSize: 16},
     usuarioTexto: { fontSize: 15, color: '#000000', marginTop: 10 },
     emptyText: { textAlign: 'center', marginTop: 40, color: '#94A3B8' },
-    fondoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 15 },
-    modalCentrado: {flex: 1,justifyContent: 'center',alignItems: 'center',backgroundColor: 'rgba(0, 0, 0, 0.5)' 
-    },
+    modalCentrado: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
     contenidoModal: { backgroundColor: '#fff', width: '100%', maxHeight: '90%', borderRadius: 12, padding: 20, alignItems: 'center', elevation: 5 },
     modalTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1a365d', marginBottom: 15 },
-    detalleText: {fontSize: 16,fontWeight: '700',color: '#000000',marginTop: 8},
-    contratado:{ backgroundColor: '#f8fafc', padding: 10, borderRadius: 6, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-    botonCerrarModal: { backgroundColor: '#757ee1', paddingVertical: 10, borderRadius: 6, width: '100%', alignItems: 'center' }
+    detalleText: { fontSize: 16, fontWeight: '700', color: '#000000', marginTop: 8 },
+    contratado: { backgroundColor: '#f8fafc', padding: 10, borderRadius: 6, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+    botonCerrarModal: { backgroundColor: '#757ee1', paddingVertical: 10, borderRadius: 6, width: '100%', alignItems: 'center' },
+    textoBotonCerrar: { color: '#FFF', fontWeight: 'bold', fontSize: 14 } // Añadido para legibilidad del texto en el botón de cierre
 });
