@@ -10,7 +10,7 @@ import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BASE_URL } from './apiConfig';
 
 export default function PantallaQR({ navigation, route }) {
-  const { idUsuario } = route.params || {};
+  const { idUsuario, nombreUsuario } = route.params || {};
   const [nombreEquipo, setNombreEquipo] = useState('');
   const [ubicacion, setUbicacion] = useState('');
   const [frecuencia, setFrecuencia] = useState('90');
@@ -191,7 +191,7 @@ export default function PantallaQR({ navigation, route }) {
         <View style={styles.menuBotones}>
           <TouchableOpacity 
             style={[styles.botonMenu, { backgroundColor: '#ffffff', borderColor: '#3b82f6', borderWidth: 1 }]} 
-            onPress={() => navigation.navigate('PantallaCamara')}
+            onPress={() => navigation.navigate('PantallaCamara', { nombreUsuario })}
             activeOpacity={0.7}
           >
             <FontAwesome name="camera" size={18} color="#3b82f6" style={styles.iconoBoton} />

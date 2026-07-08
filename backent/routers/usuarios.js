@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
+// ============================================================================
+// GESTIÓN DE USUARIOS (CRUD TRADICIONAL)
+// ============================================================================
+
 router.post('/crearusuario', async (req, res) => {
     const { nombre, usuario, clave, rol, pregunta1, respuesta1, pregunta2, respuesta2 } = req.body;
     
@@ -114,7 +118,7 @@ router.put('/actualizarusuario', async (req,res) =>{
 router.put('/reactivarusuario', async (req, res) => {
     try {
         const { id } = req.body;
-        const query = 'UPDATE usuarios SET activo = true, bloqueado = false, intentos = 0 WHERE id = $1';
+        const query = 'UPDATE usuarios SET activo = true, bloqueado = false, intentos = 0, intentos_recuperacion = 0, bloqueo_recuperacion_hasta = NULL WHERE id = $1';
         await pool.query(query, [id]);
         res.json({ success: true, mensaje: 'Usuario reactivado y desbloqueado correctamente.' });
     } catch (error) {
@@ -132,11 +136,12 @@ router.put('/eliminarusuario', async(req,res) =>{
         res.status(500).json({success: false, error: error.message})
     }
 });
+
 // ============================================================================
-// ENDPOINTS PARA LA RECUPERACIÓN DE CONTRASEÑA (FLUJO EN 3 PASOS)
+// ENDPOINTS PARA LA RECUPERACIÓN DE CONTRASEÑA (CON BLOQUEO EXPONENCIAL)
 // ============================================================================
 
-// PASO 1: Verificar usuario y retornar el ID junto con las preguntas de seguridad
+// PASO 1: Verificar usuario y retornar el ID junto con las preguntas de seguridad (Frena si está penalizado)
 router.post('/verificar-usuario-recuperacion', async (req, res) => {
     const { usuario } = req.body;
     
@@ -146,19 +151,37 @@ router.post('/verificar-usuario-recuperacion', async (req, res) => {
 
     try {
         const query = `
-            SELECT id, pregunta1, pregunta2 
+            SELECT id, pregunta1, pregunta2, bloqueo_recuperacion_hasta 
             FROM usuarios 
             WHERE LOWER(usuario) = LOWER($1) AND activo = true
         `;
         const resultado = await pool.query(query, [usuario.trim()]);
 
         if (resultado.rows.length > 0) {
+            const datosUsuario = resultado.rows[0];
+            const ahora = new Date();
+
+            // Verificar si tiene una penalización activa por tiempo
+            if (datosUsuario.bloqueo_recuperacion_hasta) {
+                const tiempoBloqueo = new Date(datosUsuario.bloqueo_recuperacion_hasta);
+                
+                if (ahora < tiempoBloqueo) {
+                    const segundosRestantes = Math.ceil((tiempoBloqueo - ahora) / 1000);
+                    const minutosRestantes = Math.ceil(segundosRestantes / 60);
+
+                    return res.json({ 
+                        success: false, 
+                        mensaje: `Módulo restringido temporalmente por seguridad. Intente de nuevo en ${minutosRestantes} minuto(s) o ${segundosRestantes} segundos.` 
+                    });
+                }
+            }
+
             res.json({ 
                 success: true, 
                 datos: {
-                    id: resultado.rows[0].id,
-                    pregunta1: resultado.rows[0].pregunta1,
-                    pregunta2: resultado.rows[0].pregunta2
+                    id: datosUsuario.id,
+                    pregunta1: datosUsuario.pregunta1,
+                    pregunta2: datosUsuario.pregunta2
                 }
             });
         } else {
@@ -170,13 +193,13 @@ router.post('/verificar-usuario-recuperacion', async (req, res) => {
     }
 });
 
-// PASO 2: Verificar si las respuestas ingresadas coinciden con la BD
+// PASO 2: Verificar si las respuestas coinciden con lógica exponencial ante fallos
 router.post('/verificar-respuestas', async (req, res) => {
     const { id, respuesta1, respuesta2 } = req.body;
 
     try {
         const query = `
-            SELECT respuesta1, respuesta2 
+            SELECT respuesta1, respuesta2, intentos_recuperacion, bloqueo_recuperacion_hasta 
             FROM usuarios 
             WHERE id = $1 AND activo = true
         `;
@@ -184,15 +207,72 @@ router.post('/verificar-respuestas', async (req, res) => {
 
         if (resultado.rows.length > 0) {
             const user = resultado.rows[0];
+            const ahora = new Date();
             
+            // Doble control: Validar que no intente saltarse el bloqueo enviando peticiones HTTP directas
+            if (user.bloqueo_recuperacion_hasta) {
+                const tiempoBloqueo = new Date(user.bloqueo_recuperacion_hasta);
+                if (ahora < tiempoBloqueo) {
+                    const segundosRestantes = Math.ceil((tiempoBloqueo - ahora) / 1000);
+                    return res.json({ 
+                        success: false, 
+                        mensaje: `Límite superado. Intente de nuevo en ${segundosRestantes} segundos.` 
+                    });
+                }
+            }
+
             // Validamos que ambas respuestas coincidan limpiando espacios y minúsculas
             const r1Correcta = user.respuesta1 === (respuesta1 ? respuesta1.trim().toLowerCase() : '');
             const r2Correcta = user.respuesta2 === (respuesta2 ? respuesta2.trim().toLowerCase() : '');
 
             if (r1Correcta && r2Correcta) {
+                // ÉXITO: Limpiamos por completo sus contadores de fallos de recuperación
+                await pool.query(
+                    'UPDATE usuarios SET intentos_recuperacion = 0, bloqueo_recuperacion_hasta = NULL WHERE id = $1', 
+                    [id]
+                );
                 res.json({ success: true, mensaje: "Respuestas validadas correctamente." });
             } else {
-                res.json({ success: false, mensaje: "Las respuestas de seguridad son incorrectas." });
+                // FALLO: Incrementamos el contador de fallos específicos de recuperación
+                const nuevosIntentos = (user.intentos_recuperacion || 0) + 1;
+                let minutosDeCastigo = 0;
+
+                // Estructura Exponencial de Penalización
+                if (nuevosIntentos === 3) {
+                    minutosDeCastigo = 1;   // 3er fallo: Bloqueo de 1 minuto
+                } else if (nuevosIntentos === 4) {
+                    minutosDeCastigo = 5;   // 4to fallo: Bloqueo de 5 minutos
+                } else if (nuevosIntentos === 5) {
+                    minutosDeCastigo = 15;  // 5to fallo: Bloqueo de 15 minutos
+                } else if (nuevosIntentos > 5) {
+                    minutosDeCastigo = 60;  // Más de 5 fallos: Bloqueo de 1 hora
+                }
+
+                if (minutosDeCastigo > 0) {
+                    const fechaDesbloqueo = new Date(ahora.getTime() + minutosDeCastigo * 60000);
+                    
+                    await pool.query(
+                        'UPDATE usuarios SET intentos_recuperacion = $1, bloqueo_recuperacion_hasta = $2 WHERE id = $3',
+                        [nuevosIntentos, fechaDesbloqueo, id]
+                    );
+
+                    res.json({ 
+                        success: false, 
+                        mensaje: `Respuestas incorrectas. Límite superado. El módulo se ha bloqueado por ${minutosDeCastigo} minuto(s).` 
+                    });
+                } else {
+                    // Fallos menores (1 y 2), no bloquean pero se guarda el contador
+                    await pool.query(
+                        'UPDATE usuarios SET intentos_recuperacion = $1 WHERE id = $2',
+                        [nuevosIntentos, id]
+                    );
+
+                    const intentosRestantes = 3 - nuevosIntentos;
+                    res.json({ 
+                        success: false, 
+                        mensaje: `Las respuestas de seguridad son incorrectas. Te quedan ${intentosRestantes} intento(s) antes del bloqueo temporal.` 
+                    });
+                }
             }
         } else {
             res.json({ success: false, mensaje: "Usuario no encontrado." });
@@ -203,15 +283,15 @@ router.post('/verificar-respuestas', async (req, res) => {
     }
 });
 
-// PASO 3: Actualizar la contraseña del usuario y resetear intentos/bloqueos
+// PASO 3: Actualizar la contraseña del usuario y resetear intentos/bloqueos generales
 router.post('/actualizar-clave-recuperacion', async (req, res) => {
     const { id, nuevaClave } = req.body;
 
     try {
-        // Actualizamos la clave y de paso limpiamos el contador de intentos por seguridad
+        // Al cambiar de contraseña exitosamente, se limpian TODOS los bloqueos (Login y Recuperación)
         const query = `
             UPDATE usuarios 
-            SET clave = $1, intentos = 0, bloqueado = false 
+            SET clave = $1, intentos = 0, bloqueado = false, intentos_recuperacion = 0, bloqueo_recuperacion_hasta = NULL 
             WHERE id = $2 AND activo = true
         `;
         await pool.query(query, [nuevaClave, id]);
@@ -223,5 +303,5 @@ router.post('/actualizar-clave-recuperacion', async (req, res) => {
     }
 });
 
-
 module.exports = router;
+

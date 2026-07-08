@@ -45,7 +45,9 @@ app.listen(PORT, '0.0.0.0', () => {
     🏨 SISTEMA POSADA VILLA MONTAÑA - BACKEND V2
     🟢 Estado: Corriendo con Seguridad de Intentos
     📍 URL Local: http://localhost:${PORT}
-    📍 Red Local: http://10.174.89.237:${PORT}
+    📍 Red Local: http://192.168.1.118:${PORT}
     ================================================
     `);
 });
+
+

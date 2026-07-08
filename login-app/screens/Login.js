@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as LocalAuthentication from 'expo-local-authentication'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 👈 1. IMPORTACIÓN AGREGADA
 import { BASE_URL } from './apiConfig';
 
 export default function Login({ navigation }) {
@@ -32,6 +33,7 @@ export default function Login({ navigation }) {
             params.rol = "Admin"; 
             navigation.replace('Admin', params);
         } else {
+            // Aquí redirige a los operadores / mantenimiento
             navigation.replace('MenuInferior', params);
         }
     }, [navigation]);
@@ -85,6 +87,13 @@ export default function Login({ navigation }) {
                 const { id_usuario, rol, nombre } = res.data;
                 const params = { idUsuario: id_usuario, nombreUsuario: nombre, rol: rol };
                 
+                // 👈 2. PERSISTENCIA DE DATOS DE SESIÓN AGREGADA
+                // Guardamos el nombre real para que PantallaCamara.js lo lea automáticamente
+                await AsyncStorage.setItem('idUsuario', String(id_usuario));
+                await AsyncStorage.setItem('nombreUsuario', nombre); // Ej: "Yeilon Rolón"
+                await AsyncStorage.setItem('rol', rol);
+                await AsyncStorage.setItem('usuario', usuario.trim());
+
                 setCargando(false); 
                 await autenticarBiometria(params);
 
@@ -208,6 +217,7 @@ export default function Login({ navigation }) {
     );
 }
 
+// Conserva tus mismos estilos exactamente iguales bajo esta línea...
 const styles = StyleSheet.create({
     mainContainer: { flex: 1, backgroundColor: '#F2F4F7' },
     scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 },
@@ -219,15 +229,12 @@ const styles = StyleSheet.create({
     inputGroup: { marginBottom: 18 },
     label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 6, marginLeft: 4 },
     input: { width: '100%', padding: 15, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1.5, borderColor: '#e2e8f0', fontSize: 16, color: '#1e293b' },
-    
-    // Contenedor para mitigar problemas con estilos de caja directos en Text
     contenedorIntentos: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
     intentosTexto: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textAlign: 'center' },
     bgAdvertencia: { backgroundColor: '#fef3c7' },
     bgBloqueado: { backgroundColor: '#fee2e2' },
     textoAdvertencia: { color: '#b45309' },
     textoBloqueado: { color: '#b91c1c' },
-    
     olvidoContainer: { alignSelf: 'flex-start', marginBottom: 24, marginLeft: 4 },
     olvidoTexto: { color: '#3b82f6', fontSize: 14, fontWeight: '500' },
     btn: { backgroundColor: '#525FE1', padding: 18, borderRadius: 14, marginTop: 10, alignItems: 'center' },

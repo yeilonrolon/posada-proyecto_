@@ -36,7 +36,7 @@ export default function RecuperacionClave({ navigation }) {
         especial: false,
     });
 
-    // Validación reactiva de la nueva contraseña
+    // Validación reactiva de la nueva contraseña (Mantenida intacta)
     useEffect(() => {
         setValidaciones({
             longitud: nuevaClave.length >= 6 && nuevaClave.length <= 8,
@@ -82,7 +82,7 @@ export default function RecuperacionClave({ navigation }) {
         }
     };
 
-    // 2. Validar respuestas de seguridad
+    // 2. Validar respuestas de seguridad (Con control de bloqueo incorporado)
     const verificarRespuestas = async () => {
         if (!respuesta1.trim() || !respuesta2.trim()) {
             return Alert.alert("Atención", "Por favor, responde ambas preguntas.");
@@ -101,6 +101,14 @@ export default function RecuperacionClave({ navigation }) {
                 setPaso(3);
             } else {
                 Alert.alert("Validación Fallida", res.data.mensaje || "Respuestas incorrectas.");
+                
+                // Si el mensaje del servidor indica que se superó el límite o la cuenta está bloqueada temporalmente:
+                if (res.data.mensaje && (res.data.mensaje.includes("bloqueado") || res.data.mensaje.includes("Límite superado"))) {
+                    setRespuesta1('');
+                    setRespuesta2('');
+                    setUsuario(''); // Limpiamos el usuario para forzar el reinicio completo del circuito
+                    setPaso(1);     // Expulsamos al paso 1 por seguridad
+                }
             }
         } catch (error) {
             console.log("Error verificando respuestas:", error.message);
@@ -220,7 +228,7 @@ export default function RecuperacionClave({ navigation }) {
                                 </View>
 
                                 {/* Pregunta 2 */}
-                                <View style={[styles.inputGroup, { marginTop: 14 }]}>
+                                <View style={[styles.inputGroup, { marginTop: 14 }] }>
                                     <Text style={styles.labelPregunta}>2. {pregunta2 || "Cargando pregunta..."}</Text>
                                     <TextInput 
                                         placeholder="Tu respuesta aquí" 

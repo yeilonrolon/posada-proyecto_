@@ -19,6 +19,9 @@ export default function PantallaListaQR({ navigation, route }) {
   const [nombreEdit, setNombreEdit] = useState('');
   const [ubicacionEdit, setUbicacionEdit] = useState('');
   const [frecuenciaEdit, setFrecuenciaEdit] = useState('');
+  
+  // ✨ NUEVO ESTADO: Guarda el historial obtenido del endpoint relacional
+  const [historialActivo, setHistorialActivo] = useState([]);
 
   const qrRef = useRef(null);
   const API_URL = `${BASE_URL}/api/equipos`;
@@ -50,9 +53,6 @@ export default function PantallaListaQR({ navigation, route }) {
     return ordenarRecarga;
   }, [navigation]);
 
-  // ==========================================
-  // NUEVA FUNCIÓN: ELIMINAR ACTIVO EN POSTGRES
-  // ==========================================
   const ejecutarEliminacion = async (idEquipo) => {
     try {
       setCargando(true);
@@ -63,7 +63,7 @@ export default function PantallaListaQR({ navigation, route }) {
 
       if (respuesta.ok && resultado.success) {
         Alert.alert('Eliminado 🗑️', 'El equipo ha sido removido del sistema con éxito.');
-        obtenerEquiposBD(); // Refrescar la lista de inmediato
+        obtenerEquiposBD(); 
       } else {
         Alert.alert('Error', resultado.error || 'No se pudo eliminar el activo.');
         setCargando(false);
@@ -76,28 +76,35 @@ export default function PantallaListaQR({ navigation, route }) {
   };
 
   const presionarBotonEliminar = (equipo) => {
-    // Doble confirmación nativa para proteger los datos de inventario
     Alert.alert(
       '⚠️ ELIMINAR ACTIVO',
       `¿Estás completamente seguro de eliminar el equipo "${equipo.nombre_equipo}"? Esta acción borrará permanentemente el registro en PostgreSQL.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Sí, Eliminar', 
-          style: 'destructive', 
-          onPress: () => ejecutarEliminacion(equipo.id) 
-        }
+        { text: 'Sí, Eliminar', style: 'destructive', onPress: () => ejecutarEliminacion(equipo.id) }
       ],
       { cancelable: true }
     );
   };
 
-  const abrirEditorYQR = (equipo) => {
+  // 🔄 MODIFICADO: Ahora hace FETCH individual al abrir para jalar el historial
+  const abrirEditorYQR = async (equipo) => {
     setIdSeleccionado(equipo.id);
     setNombreEdit(equipo.nombre_equipo);
     setUbicacionEdit(equipo.ubicacion);
     setFrecuenciaEdit(equipo.frecuencia_mantenimiento ? equipo.frecuencia_mantenimiento.toString() : '90');
+    setHistorialActivo([]); // Limpiar historial anterior
     setModalVisible(true);
+
+    try {
+      const res = await fetch(`${API_URL}/${equipo.id}`);
+      const JSONres = await res.json();
+      if (res.ok && JSONres.success && JSONres.datos.historial) {
+        setHistorialActivo(JSONres.datos.historial); // Guardamos la bitácora relacional de Postgres
+      }
+    } catch (err) {
+      console.log('No se pudo obtener el historial para este ID:', err.message);
+    }
   };
 
   const ejecutarActualizacionYDescarga = async () => {
@@ -118,7 +125,7 @@ export default function PantallaListaQR({ navigation, route }) {
           nombre_equipo: nombreEdit.trim(),
           ubicacion: ubicacionEdit.trim(),
           frecuencia_mantenimiento: parseInt(frecuenciaEdit, 10) || 90,
-          registrado_por: idUsuario
+          registrado_por: idUsuario ? parseInt(idUsuario, 10) : null 
         })
       });
 
@@ -210,7 +217,6 @@ export default function PantallaListaQR({ navigation, route }) {
 
     return (
       <View style={styles.tarjeta}>
-        {/* Contenido clickeable para abrir edición */}
         <TouchableOpacity style={styles.infoIzquierda} onPress={() => abrirEditorYQR(item)} activeOpacity={0.6}>
           <Text style={styles.idBadge}>ID: #{item.id}</Text>
           <Text style={styles.itemNombre}>{item.nombre_equipo}</Text>
@@ -219,13 +225,10 @@ export default function PantallaListaQR({ navigation, route }) {
           {item.nombre_usuario && <Text style={styles.revisado}>👤 Por: {item.nombre_usuario}</Text>}
         </TouchableOpacity>
 
-        {/* Panel lateral derecho de acciones rápidas */}
         <View style={styles.columnaAcciones}>
           <TouchableOpacity style={styles.indicadorQR} onPress={() => abrirEditorYQR(item)}>
             <Text style={styles.textoMiniQR}>⚙️ QR</Text>
           </TouchableOpacity>
-          
-          {/* BOTÓN NUEVO DE ELIMINAR */}
           <TouchableOpacity style={styles.botonEliminarTarjeta} onPress={() => presionarBotonEliminar(item)}>
             <Text style={styles.textoEliminarTarjeta}>🗑️</Text>
           </TouchableOpacity>
@@ -256,7 +259,6 @@ export default function PantallaListaQR({ navigation, route }) {
         />
       )}
 
-      {/* MODAL INTEGRADO */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -282,7 +284,6 @@ export default function PantallaListaQR({ navigation, route }) {
               </View>
               <Text style={styles.modalInstrucciones}>El QR cambia automáticamente si editas los datos de abajo.</Text>
 
-              {/* Formulario de Edición */}
               <View style={styles.formEdicion}>
                 <Text style={styles.labelModal}>Nombre del Equipo:</Text>
                 <TextInput 
@@ -308,6 +309,24 @@ export default function PantallaListaQR({ navigation, route }) {
                   keyboardType="numeric"
                   editable={!procesandoFlujo}
                 />
+              </View>
+
+              {/* ✨ NUEVO: SECCIÓN DE BITÁCORA HISTÓRICA DENTRO DEL SCROLLVIEW */}
+              <View style={styles.seccionHistorial}>
+                <Text style={styles.tituloSeccionHistorial}>📜 Historial de Revisiones / Arreglos</Text>
+                {historialActivo.length === 0 ? (
+                  <Text style={styles.txtHistorialVacio}>No hay mantenimientos previos registrados para este QR.</Text>
+                ) : (
+                  historialActivo.map((log) => (
+                    <View key={log.id} style={styles.itemHistorialFila}>
+                      <View style={styles.encabezadoFilaHistorial}>
+                        <Text style={styles.txtHistorialResponsable}>👤 {log.responsable}</Text>
+                        <Text style={styles.txtHistorialFecha}>📅 {log.fecha}</Text>
+                      </View>
+                      <Text style={styles.txtHistorialDetalle}>{log.detalle}</Text>
+                    </View>
+                  ))
+                )}
               </View>
 
               <TouchableOpacity 
@@ -358,14 +377,11 @@ const styles = StyleSheet.create({
   itemUbicacion: { fontSize: 13, color: '#475569', marginBottom: 4, fontWeight: '500' },
   revisado: { fontSize: 12, color: '#64748b', marginBottom: 4, fontWeight: '500' },
   itemFecha: { fontSize: 12, color: '#0f766e', fontWeight: '600' },
-  
-  // Panel derecho ajustado para dos botones limpios
   columnaAcciones: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   indicadorQR: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
   textoMiniQR: { fontSize: 11, color: '#3b82f6', fontWeight: '700' },
   botonEliminarTarjeta: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#fef2f2', borderRadius: 8, borderWidth: 1, borderColor: '#fee2e2' },
   textoEliminarTarjeta: { fontSize: 13 },
-
   fondoModal: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.3)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   contenidoModal: { backgroundColor: '#fff', width: '100%', maxHeight: '85%', borderRadius: 16, padding: 20, alignItems: 'center', elevation: 5 },
   modalTitulo: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -380,4 +396,14 @@ const styles = StyleSheet.create({
   textoBotonAccion: { color: '#fff', fontSize: 14, fontWeight: '600' },
   botonCerrarModal: { backgroundColor: '#ffffff', paddingVertical: 12, borderRadius: 10, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#64748b' },
   textoBotonCerrar: { color: '#64748b', fontSize: 14, fontWeight: '600' },
+
+  // ✨ NUEVOS ESTILOS PARA LA SECCIÓN DE REPARACIONES
+  seccionHistorial: { width: '100%', backgroundColor: '#f8fafc', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#cbd5e1', marginBottom: 20 },
+  tituloSeccionHistorial: { fontSize: 13, fontWeight: '700', color: '#1e293b', marginBottom: 10, textTransform: 'uppercase' },
+  txtHistorialVacio: { fontSize: 12, color: '#64748b', textAlign: 'center', fontStyle: 'italic', paddingVertical: 8 },
+  itemHistorialFila: { backgroundColor: '#fff', padding: 10, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  encabezadoFilaHistorial: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  txtHistorialResponsable: { fontSize: 12, fontWeight: '700', color: '#334155' },
+  txtHistorialFecha: { fontSize: 11, color: '#64748b' },
+  txtHistorialDetalle: { fontSize: 12, color: '#475569', lineHeight: 16 }
 });
