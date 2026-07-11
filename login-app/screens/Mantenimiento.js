@@ -56,7 +56,7 @@ export default function Mantenimiento({ navigation, route }) {
                 if (resFechas.data.success && Array.isArray(resFechas.data.datos)) {
                     verificarAntiguedad(resFechas.data.datos);
                 }
-            } catch (e) {
+            } catch {
                 console.log("Aviso: No se pudo verificar antigüedad.");
             }
 

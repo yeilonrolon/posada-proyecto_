@@ -46,11 +46,9 @@ router.post('/crearusuario', async (req, res) => {
 router.get('/listausuarios', async (req, res) => {
     try {
         const query = `
-            SELECT id, nombre, usuario, rol, 
-            pregunta1, respuesta1, 
-            pregunta2, respuesta2 
-            FROM usuarios 
-            WHERE activo = true 
+            SELECT id, nombre, usuario, rol
+            FROM usuarios
+            WHERE activo = true
             ORDER BY id DESC
         `;
         const resultado = await pool.query(query);

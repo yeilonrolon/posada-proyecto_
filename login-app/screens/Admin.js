@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { Text, StyleSheet, View, TouchableOpacity, ScrollView} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // ✅ Helper extraído fuera del componente para evitar re-creación y parpadeos en los renders
@@ -54,6 +55,15 @@ export default function Admin({ route, navigation }) {
                     libreria={FontAwesome}
                     colorAcento="#8b5cf6"
                     onPress={() => navigation.navigate('qr', { idUsuario, nombreUsuario, rol })}
+                />
+
+                <RenderBotonAdmin 
+                    titulo="Generador de PDF"
+                    subtitulo="Crear reportes PDF del sistema"
+                    icono="file-pdf-o"
+                    libreria={FontAwesome}
+                    colorAcento="#ef4444"
+                    onPress={() => navigation.navigate('GeneradorPDF', { idUsuario, nombreUsuario, rol })}
                 />
 
                 <RenderBotonAdmin 

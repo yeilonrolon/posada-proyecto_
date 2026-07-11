@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   StyleSheet, Text, View, FlatList, TouchableOpacity, 
   ActivityIndicator, Alert, Modal, TextInput, ScrollView, InteractionManager 
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as MediaLibrary from 'expo-media-library';
-import { BASE_URL } from './apiConfig'; 
-import * as FileSystem from 'expo-file-system/legacy'; 
+import * as FileSystem from 'expo-file-system';
+import { BASE_URL } from './apiConfig';
 
 export default function PantallaListaQR({ navigation, route }) {
   const { idUsuario } = route.params || {};
@@ -26,7 +26,7 @@ export default function PantallaListaQR({ navigation, route }) {
   const qrRef = useRef(null);
   const API_URL = `${BASE_URL}/api/equipos`;
 
-  const obtenerEquiposBD = async () => {
+  const obtenerEquiposBD = useCallback(async () => {
     try {
       setCargando(true);
       const respuesta = await fetch(API_URL);
@@ -37,13 +37,13 @@ export default function PantallaListaQR({ navigation, route }) {
       } else {
         Alert.alert('Error', 'No se pudieron recuperar los activos del servidor.');
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
+      console.error('Error obteniendo equipos');
       Alert.alert('Error de conexión', 'Verifica el backend y tu red Wi-Fi.');
     } finally {
       setCargando(false);
     }
-  };
+  }, [API_URL]);
 
   useEffect(() => {
     obtenerEquiposBD();
@@ -51,7 +51,7 @@ export default function PantallaListaQR({ navigation, route }) {
       obtenerEquiposBD();
     });
     return ordenarRecarga;
-  }, [navigation]);
+  }, [navigation, obtenerEquiposBD]);
 
   const ejecutarEliminacion = async (idEquipo) => {
     try {
@@ -161,14 +161,12 @@ export default function PantallaListaQR({ navigation, route }) {
         return;
       }
 
-      const nombreArchivo = `QR_Actualizado_ID${idSeleccionado}_${Date.now()}.png`;
-      const rutaTemporal = `${FileSystem.cacheDirectory}${nombreArchivo}`;
-
-      await FileSystem.writeAsStringAsync(rutaTemporal, dataURL, {
+      const archivoTemp = new FileSystem.File(FileSystem.Paths.cache, `QR_Actualizado_ID${idSeleccionado}_${Date.now()}.png`);
+      await FileSystem.writeAsStringAsync(archivoTemp.uri, dataURL, {
         encoding: 'base64',
       });
 
-      await MediaLibrary.saveToLibraryAsync(rutaTemporal);
+      await MediaLibrary.saveToLibraryAsync(archivoTemp.uri);
 
       Alert.alert(
         '¡Actualización Exitosa! 🔄📥', 

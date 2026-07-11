@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  ScrollView, Alert, SafeAreaView, ActivityIndicator, Keyboard 
+  ScrollView, Alert,ActivityIndicator, Keyboard 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
-import * as FileSystem from 'expo-file-system/legacy'; 
+import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BASE_URL } from './apiConfig';
@@ -95,11 +96,9 @@ export default function PantallaQR({ navigation, route }) {
         return Alert.alert('Error', 'No se pudieron extraer los datos gráficos.');
       }
 
-      const nombreArchivo = `QR_Activo_${Date.now()}.png`;
-      const rutaTemporal = `${FileSystem.cacheDirectory}${nombreArchivo}`;
-
-      await FileSystem.writeAsStringAsync(rutaTemporal, dataURL, { encoding: 'base64' });
-      await MediaLibrary.saveToLibraryAsync(rutaTemporal);
+      const archivoTemp = new FileSystem.File(FileSystem.Paths.cache, `QR_Activo_${Date.now()}.png`);
+      await FileSystem.writeAsStringAsync(archivoTemp.uri, dataURL, { encoding: 'base64' });
+      await MediaLibrary.saveToLibraryAsync(archivoTemp.uri);
       
       Alert.alert('¡Guardado Exitoso! 📥', 'El código QR se descargó en tu galería como imagen PNG. Está listo para imprimir.');
     } catch (error) {

@@ -25,6 +25,7 @@ import CostoReparacion from './screens/CostoReparacion';
 import PantallaCamara from './screens/PantallaCamara';
 import PantallaListaQR from './screens/PantallaListaQR';
 import qr from './screens/qr';
+import GeneradorPDF from './screens/GeneradorPDF';
 
 const Stack = createStackNavigator();
 
@@ -171,6 +172,12 @@ export default function App() {
             name="qr" 
             component={qr} 
             options={{ title: 'Control de Activos QR' }} 
+          />
+
+          <Stack.Screen 
+            name="GeneradorPDF" 
+            component={GeneradorPDF} 
+            options={{ title: 'GENERADOR DE PDF', headerRight: null }} 
           />
 
         </Stack.Navigator>

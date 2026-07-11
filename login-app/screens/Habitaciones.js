@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-    Text, StyleSheet, View, TouchableOpacity, FlatList, 
+    Text, StyleSheet, View, FlatList, 
     Alert, ActivityIndicator, RefreshControl 
 } from 'react-native';
 import axios from 'axios';
@@ -10,7 +10,7 @@ export default function Habitaciones({ navigation, route }) {
     const API_URL = BASE_URL;
     
     // Parámetros seguros con valores por defecto
-    const { idUsuario = null, nombreUsuario = 'Operador' } = route.params || {};
+    const { nombreUsuario = 'Operador' } = route.params || {};
     
     const [habitaciones, setHabitaciones] = useState([]);
     const [cargando, setCargando] = useState(true);

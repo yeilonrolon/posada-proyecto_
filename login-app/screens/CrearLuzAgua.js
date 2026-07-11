@@ -46,6 +46,20 @@ export default function CrearLuzAgua({ navigation, route }) {
                     `El valor registrado (${valorNumerico}) debe ser mayor al último valor registrado (${ultimoValor}).`
                 );
             }
+
+            const salto = valorNumerico - ultimoValor;
+            const ratio = ultimoValor > 0 ? valorNumerico / ultimoValor : 1;
+            if (ultimoValor > 0 && (ratio >= 2.0 || salto >= 300)) {
+                setCargando(false);
+                return Alert.alert(
+                    "⚠️ Lectura inusual",
+                    `Se detecta un salto grande desde ${ultimoValor} hasta ${valorNumerico}. Verifica la lectura antes de guardar.`,
+                    [
+                        { text: "Cancelar", style: "cancel" },
+                        { text: "Continuar", onPress: () => guardarRegistro(valorNumerico) }
+                    ]
+                );
+            }
             
             // Si pasa la validación, procede a guardar
             await guardarRegistro(valorNumerico);

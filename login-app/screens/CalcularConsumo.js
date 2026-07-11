@@ -17,13 +17,13 @@ export default function CalcularConsumo() {
     const [tipo, setTipo] = useState('Agua');
     const [mes, setMes] = useState(mesActual);
     // ✅ Nuevo estado para manejar el año del reporte de forma dinámica y evitar errores en fin de año
-    const [anioReporte, setAnioReporte] = useState(anioActual); 
+    const [anioReporte, setAnioReporte] = useState(anioActual);
     const [cargando, setCargando] = useState(false);
     const [resultado, setResultado] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [errorModalVisible, setErrorModalVisible] = useState(false);
     const [errorModalMensaje, setErrorModalMensaje] = useState('');
-    const [reportMode, setReportMode] = useState('Mes'); 
+    const [reportMode, setReportMode] = useState('Mes');
     const [generandoPdf, setGenerandoPdf] = useState(false);
     const [desdeMes, setDesdeMes] = useState(1);
     const [desdeAnio, setDesdeAnio] = useState(anioActual);
@@ -38,6 +38,14 @@ export default function CalcularConsumo() {
     const mostrarError = (mensaje) => {
         setErrorModalMensaje(mensaje);
         setErrorModalVisible(true);
+    };
+
+    const calcularGraficoDeConsumo = (mesesConsumo) => {
+        const maxTotal = Math.max(...mesesConsumo.map((item) => item.total), 1);
+        return mesesConsumo.map((item) => ({
+            ...item,
+            width: Math.max(5, (item.total / maxTotal) * 100)
+        }));
     };
 
     const generarPdfConsumo = async () => {
@@ -64,6 +72,11 @@ export default function CalcularConsumo() {
                 rows.push({ label: 'Lectura inicial', value: `${resultado.lectura_inicial} ${resultado.unidad}` });
                 rows.push({ label: 'Lectura final', value: `${resultado.lectura_final} ${resultado.unidad}` });
                 rows.push({ label: 'Consumo total', value: `${resultado.consumo} ${resultado.unidad}` });
+            } else if (resultado.type === 'Todos') {
+                rows.push({ label: 'Servicio', value: `${resultado.tipo}` });
+                rows.push({ label: 'Mes con mayor consumo', value: `${resultado.mesMayor || 'No disponible'}` });
+                rows.push({ label: 'Consumo total', value: `${resultado.consumoTotal.toFixed(2)} ${resultado.unidad}` });
+                rows.push({ label: 'Meses registrados', value: `${resultado.meses.length}` });
             }
 
             const rowsHtml = rows.map(row => `
@@ -104,6 +117,12 @@ export default function CalcularConsumo() {
                         th, td { padding: 14px 16px; border: 1px solid var(--border); }
                         th { background: #eef2ff; color: var(--primary); font-weight: 700; text-align: left; }
                         tbody tr:nth-child(even) { background: #f8fafc; }
+                        .chart-section { margin-top: 24px; }
+                        .chart-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+                        .chart-label { width: 22%; font-size: 12px; color: var(--text); }
+                        .chart-bar { flex: 1; height: 14px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+                        .chart-fill { height: 100%; background: #4f46e5; border-radius: 999px; }
+                        .chart-value { width: 20%; font-size: 12px; color: var(--text); text-align: right; }
                         .footer { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
                     </style>
                 </head>
@@ -125,7 +144,7 @@ export default function CalcularConsumo() {
                                 </div>
                                 <div class="info-block">
                                     <strong>Tipo de reporte</strong>
-                                    <span>${resultado.type === 'Mes' ? 'Mensual' : resultado.type === 'Rango' ? 'Acumulado' : 'Último valor'}</span>
+                                    <span>${resultado.type === 'Mes' ? 'Mensual' : resultado.type === 'Rango' ? 'Acumulado' : resultado.type === 'Todos' ? 'Todos los meses' : 'Último valor'}</span>
                                 </div>
                             </div>
 
@@ -140,6 +159,18 @@ export default function CalcularConsumo() {
                                     ${rowsHtml}
                                 </tbody>
                             </table>
+                            ${resultado.type === 'Todos' ? `
+                                <div class="chart-section">
+                                    <h3>Consumo mensual</h3>
+                                    ${resultado.meses.map((item) => `
+                                        <div class="chart-row">
+                                            <span>${item.mesAnio}</span>
+                                            <div class="chart-bar" style="width: ${item.width}%"></div>
+                                            <span>${item.total.toFixed(2)} ${resultado.unidad}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
 
                             <div class="footer">
                                 Posada Villa Montaña C.A. · Sistema de mantenimiento y consumo
@@ -234,6 +265,32 @@ export default function CalcularConsumo() {
                 } else {
                     mostrarError(res.data.mensaje || 'No hay datos para el rango solicitado.');
                 }
+            } else if (reportMode === 'Todos') {
+                const res = await axios.get(`${API_URL}/consumo-todos-meses`, {
+                    params: { tipo },
+                    timeout: 8000
+                });
+
+                if (res.data.success && Array.isArray(res.data.meses)) {
+                    const mesesDatos = res.data.meses.map((item) => ({
+                        ...item,
+                        mesAnio: `${meses[item.mes - 1]?.label || item.mes} ${item.anio}`
+                    }));
+                    const mesesConAncho = calcularGraficoDeConsumo(mesesDatos);
+                    const consumoTotal = mesesConAncho.reduce((sum, item) => sum + item.total, 0);
+                    const mejorMes = mesesConAncho.reduce((prev, current) => current.total > prev.total ? current : prev, { total: -Infinity });
+                    setResultado({
+                        type: 'Todos',
+                        tipo,
+                        unidad: tipo === 'Agua' ? 'M3' : 'KWH',
+                        meses: mesesConAncho,
+                        consumoTotal,
+                        mesMayor: mejorMes.mesAnio || 'No disponible'
+                    });
+                    setModalVisible(true);
+                } else {
+                    mostrarError(res.data.mensaje || 'No hay datos disponibles para el reporte de todos los meses.');
+                }
             }
         } catch (error) {
             const mensajeFromServer = error?.response?.data?.mensaje || error?.response?.data?.error;
@@ -267,6 +324,7 @@ export default function CalcularConsumo() {
                             <Picker.Item label="Individual (Último valor)" value="Individual" />
                             <Picker.Item label="Mes" value="Mes" />
                             <Picker.Item label="Rango (Acumulado)" value="Rango" />
+                            <Picker.Item label="Todos los meses" value="Todos" />
                         </Picker>
                     </View>
 
@@ -282,7 +340,7 @@ export default function CalcularConsumo() {
                         </Picker>
                     </View>
 
-                    {reportMode !== 'Individual' && (
+                    {(reportMode === 'Mes' || reportMode === 'Rango') && (
                         <>
                             <Text style={styles.label}>{reportMode === 'Rango' ? 'Seleccione Mes (Hasta):' : 'Seleccione Mes:'}</Text>
                             <View style={styles.pickerContainer}>
@@ -434,6 +492,38 @@ export default function CalcularConsumo() {
                                 </>
                             )}
 
+                            {resultado && resultado.type === 'Todos' && (
+                                <>
+                                    <View style={modalStyles.row}>
+                                        <Text style={modalStyles.label}>Servicio:</Text>
+                                        <Text style={modalStyles.value}>{resultado.tipo}</Text>
+                                    </View>
+                                    <View style={modalStyles.row}>
+                                        <Text style={modalStyles.label}>Mes con mayor consumo:</Text>
+                                        <Text style={modalStyles.value}>{resultado.mesMayor}</Text>
+                                    </View>
+                                    <View style={modalStyles.row}>
+                                        <Text style={modalStyles.label}>Consumo total:</Text>
+                                        <Text style={modalStyles.value}>{resultado.consumoTotal.toFixed(2)} {resultado.unidad}</Text>
+                                    </View>
+                                    <View style={modalStyles.row}>
+                                        <Text style={modalStyles.label}>Meses registrados:</Text>
+                                        <Text style={modalStyles.value}>{resultado.meses.length}</Text>
+                                    </View>
+                                    <View style={modalStyles.chartContainer}>
+                                        {resultado.meses.slice(0, 6).map((item) => (
+                                            <View key={item.mesAnio} style={modalStyles.chartRowSmall}>
+                                                <Text style={modalStyles.chartLabelSmall}>{item.mesAnio}</Text>
+                                                <View style={modalStyles.chartBarSmall}>
+                                                    <View style={[modalStyles.chartBarFillSmall, { width: `${item.width}%` }]} />
+                                                </View>
+                                                <Text style={modalStyles.chartValueSmall}>{item.total.toFixed(1)} {resultado.unidad}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </>
+                            )}
+
                             <TouchableOpacity
                                 onPress={generarPdfConsumo}
                                 style={[styles.btn, { backgroundColor: '#10B981', marginTop: 10, opacity: generandoPdf ? 0.7 : 1 }]}
@@ -530,6 +620,38 @@ const modalStyles = StyleSheet.create({
         fontSize: 14,
         color: '#2C3E50',
         maxWidth: '60%',
+        textAlign: 'right'
+    },
+    chartContainer: {
+        marginTop: 18,
+        gap: 8
+    },
+    chartRowSmall: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8
+    },
+    chartLabelSmall: {
+        width: '22%',
+        fontSize: 12,
+        color: '#34495E'
+    },
+    chartBarSmall: {
+        flex: 1,
+        height: 10,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 6,
+        overflow: 'hidden'
+    },
+    chartBarFillSmall: {
+        height: '100%',
+        backgroundColor: '#525FE1'
+    },
+    chartValueSmall: {
+        width: '24%',
+        fontSize: 12,
+        color: '#2C3E50',
         textAlign: 'right'
     }
 });

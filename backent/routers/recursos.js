@@ -188,4 +188,58 @@ router.get('/listagastos', async (req, res) => {
     }
 });
 
+router.get('/consumo-todos-meses', async (req, res) => {
+    const { tipo } = req.query;
+    if (!tipo) {
+        return res.status(400).json({ success: false, mensaje: 'Falta el tipo de recurso.' });
+    }
+
+    try {
+        const query = `
+            SELECT lectura_valor, fecha_registro
+            FROM consumos_recursos
+            WHERE tipo = $1
+            ORDER BY fecha_registro ASC
+        `;
+        const resultado = await pool.query(query, [tipo]);
+
+        if (resultado.rows.length === 0) {
+            return res.json({ success: false, mensaje: 'No hay registros de consumo para este recurso.' });
+        }
+
+        const lecturasPorMes = {};
+        resultado.rows.forEach((item) => {
+            const fecha = new Date(item.fecha_registro);
+            const mes = fecha.getMonth() + 1;
+            const anio = fecha.getFullYear();
+            const key = `${String(mes).padStart(2, '0')}/${anio}`;
+            const lectura = parseFloat(item.lectura_valor);
+            if (isNaN(lectura)) return;
+            if (!lecturasPorMes[key] || lectura > lecturasPorMes[key].lectura) {
+                lecturasPorMes[key] = { mes, anio, lectura };
+            }
+        });
+
+        const mesesOrdenados = Object.values(lecturasPorMes).sort((a, b) => {
+            return a.anio === b.anio ? a.mes - b.mes : a.anio - b.anio;
+        });
+
+        let anterior = null;
+        const consumos = mesesOrdenados.map((item) => {
+            const consumo = anterior !== null ? Number((item.lectura - anterior).toFixed(2)) : 0;
+            anterior = item.lectura;
+            return {
+                mes: item.mes,
+                anio: item.anio,
+                total: consumo < 0 ? 0 : consumo
+            };
+        });
+
+        res.json({ success: true, meses: consumos });
+    } catch (error) {
+        console.error('Error en consumo-todos-meses:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

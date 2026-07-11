@@ -23,8 +23,6 @@ export default function PantallaCamara({ navigation, route }) {
     
     // Almacenamos tanto el nombre legible (para la interfaz) como el alias (para la API)
     const [nombreVisible, setNombreVisible] = useState(nombreDesdeRuta || 'Operario Técnico'); 
-    const [aliasUsuario, setAliasUsuario] = useState('');
-
     // Almacena la descripción del trabajo técnico obligatorio
     const [detalleRevision, setDetalleRevision] = useState('');
 
@@ -43,11 +41,9 @@ export default function PantallaCamara({ navigation, route }) {
         const cargarDatosSesion = async () => {
             try {
                 const nombre = await AsyncStorage.getItem('nombreUsuario');
-                const usuarioAlias = await AsyncStorage.getItem('usuario'); // 👈 El alias guardado en Login
                 const nombreFinal = nombreDesdeRuta || nombre || 'Operario Técnico';
                 
                 if (nombreFinal) setNombreVisible(nombreFinal);
-                if (usuarioAlias) setAliasUsuario(usuarioAlias);
             } catch (error) {
                 console.error("Error cargando sesión en la cámara:", error);
             }
@@ -60,7 +56,7 @@ export default function PantallaCamara({ navigation, route }) {
 
     useEffect(() => {
         if (!permission) { requestPermission(); }
-    }, [permission]);
+    }, [permission, requestPermission]);
 
     const cerrarModalYReintentar = useCallback(() => {
         setModalVisible(false);
@@ -124,7 +120,7 @@ export default function PantallaCamara({ navigation, route }) {
                 );
             }
 
-        } catch (e) {
+        } catch {
             setBuscandoBD(false);
             Alert.alert(
                 'Error de Lectura', 

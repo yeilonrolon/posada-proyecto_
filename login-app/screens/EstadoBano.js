@@ -6,6 +6,7 @@ import {
 import axios from 'axios';
 import { BASE_URL } from './apiConfig';
 
+
 export default function EstadoBano({ navigation, route }) {
     const API_URL = BASE_URL;
     
@@ -56,7 +57,7 @@ export default function EstadoBano({ navigation, route }) {
                 if (resFechas.data.success) {
                     verificarAntiguedad(resFechas.data.datos);
                 }
-            } catch (e) {
+            } catch {
                 console.log("Aviso: No se pudo verificar antigüedad.");
             }
 
