@@ -122,6 +122,12 @@ export default function EstadoBano({ navigation, route }) {
                     <Text style={styles.textoBotonNuevo}>➕ NUEVO ESTADO</Text>
                 </TouchableOpacity>
             )}
+            <TouchableOpacity
+                            style={styles.botonNuevo}
+                            activeOpacity={0.7}
+                            onPress={() => navigation.navigate('Habitaciones', { idUsuario, nombreUsuario, rol })}>
+                            <Text style={styles.textoBotonNuevo}> ESTADOS DE HABITACIONES </Text>
+            </TouchableOpacity>
 
             <Text style={styles.tituloSeccion}>Historial de Estados</Text>
 
@@ -157,7 +163,7 @@ const styles = StyleSheet.create({
         borderRadius: 15, 
         alignItems: 'center', 
         elevation: 4,
-        marginBottom: 25 
+        marginBottom: 15
     },
     textoBotonNuevo: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
     tituloSeccion: { fontSize: 14, fontWeight: 'bold', color: '#94A3B8', marginBottom: 15, textTransform: 'uppercase' },

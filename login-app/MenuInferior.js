@@ -6,6 +6,7 @@ import EstadoBano from './screens/EstadoBano';
 import Habitaciones from './screens/Habitaciones';
 import CostoReparacion from './screens/CostoReparacion';
 import PantallaPrincipal from './screens/qr';
+import MisTareasAsignadas from './screens/MisTareasAsignadas';
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
@@ -70,14 +71,14 @@ export default function MenuInferior({ route, navigation }) {
       />
       
       <Tab.Screen 
-        name="HabitacionesTab" 
-        component={Habitaciones} 
+        name="MisTareas" 
+        component={MisTareasAsignadas} 
         initialParams={{ idUsuario, nombreUsuario }} 
         options={{
-          title: 'ESTADOS DE HABITACIONES',
-          tabBarLabel: 'Habitaciones', 
+          title: 'MIS TAREAS',
+          tabBarLabel: 'Mis tareas', 
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="airline-seat-individual-suite" size={size || 20} color={color} />
+            <MaterialIcons name="assignment" size={size || 24} color={color} />
           )
         }} 
       />

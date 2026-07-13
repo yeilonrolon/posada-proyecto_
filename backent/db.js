@@ -11,7 +11,7 @@ const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'posada_mantenimiento', // Base de datos del proyecto
-    password: dbPassword,
+    password: '06091222',
     port: 5432,
     allowExitOnIdle: false,
 });

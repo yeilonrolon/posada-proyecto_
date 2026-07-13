@@ -74,6 +74,14 @@ export default function Admin({ route, navigation }) {
                     colorAcento="#10b981"
                     onPress={() => navigation.navigate('CostoReparacion', { idUsuario, nombreUsuario, rol })}
                 />
+                <RenderBotonAdmin 
+                    titulo="Control de Tareas"
+                    subtitulo="Verificar asignaciones y estados"
+                    icono="clipboard-text-clock"
+                    libreria={MaterialCommunityIcons}
+                    colorAcento="#f97316" // Color naranja llamativo para testing
+                    onPress={() => navigation.navigate('ListaTareas', { idUsuario, nombreUsuario, rol })} 
+                />
 
                 {/* SECCIÓN: INFRAESTRUCTURA (HABITACIONES Y BAÑOS) */}
                 <Text style={styles.seccionTitulo}>Monitoreo de Planta</Text>

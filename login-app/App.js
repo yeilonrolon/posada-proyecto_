@@ -26,6 +26,9 @@ import PantallaCamara from './screens/PantallaCamara';
 import PantallaListaQR from './screens/PantallaListaQR';
 import qr from './screens/qr';
 import GeneradorPDF from './screens/GeneradorPDF';
+import AsignarTareas from './screens/AsignarTareas';
+import ListaTareas from './screens/ListaTareas';
+
 
 const Stack = createStackNavigator();
 
@@ -179,7 +182,16 @@ export default function App() {
             component={GeneradorPDF} 
             options={{ title: 'GENERADOR DE PDF', headerRight: null }} 
           />
-
+          <Stack.Screen 
+            name="AsignarTareas"
+            component={AsignarTareas}
+            options={{ title: 'ASIGNAR TAREAS',headerRight: null  }}
+          />
+          <Stack.Screen 
+            name="ListaTareas"
+            component={ListaTareas}
+            options={{ title: 'REGISTRO DE TAREAS',headerRight: null  }}
+          />
         </Stack.Navigator>
         <StatusBar style="light" />
       </NavigationContainer>

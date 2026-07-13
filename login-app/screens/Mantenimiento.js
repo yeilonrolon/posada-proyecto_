@@ -3,6 +3,7 @@ import {
     Text, StyleSheet, View, TouchableOpacity, FlatList, 
     Alert, ActivityIndicator, RefreshControl 
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
@@ -42,6 +43,37 @@ export default function Mantenimiento({ navigation, route }) {
         }
     }, [navigation, idUsuario, nombreUsuario]);
 
+    useFocusEffect(
+        useCallback(() => {
+            const comprobarTareasPendientes = async () => {
+                if (!idUsuario) return;
+                try {
+                    const res = await axios.get(`${BASE_URL}/verificar-pendientes/${idUsuario}`);
+                    
+                    if (res.data.success && res.data.tienePendientes) {
+                        Alert.alert(
+                            "Tareas Pendientes 📋",
+                            `Tienes ${res.data.cantidad} tarea(s) asignada(s) . ¿Deseas revisarlos ahora?`,
+                            [
+                                { 
+                                    text: "Luego", 
+                                    style: "cancel" 
+                                },
+                                { 
+                                    text: "Ir a mis tareas", 
+                                    onPress: () => navigation.navigate("MisTareas", { idUsuario }) 
+                                }
+                            ],
+                            { cancelable: true }
+                        );
+                    }
+                } catch (error) {
+                    console.error("Error silencioso al verificar pendientes:", error.message);
+                }
+            };
+            comprobarTareasPendientes();
+        }, [idUsuario])
+    );
     const cargarDatos = useCallback(async () => {
         try {
             // 1. Obtener Historial (CORRECCIÓN: Eliminado objeto vacío central)
