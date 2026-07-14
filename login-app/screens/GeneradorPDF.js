@@ -96,9 +96,24 @@ const calcularConsumoTotalRegistrado = async () => {
 
 const generarQrDataUrl = async (texto) => {
     try {
-        return await QRCode.toDataURL(texto, { margin: 1, width: 180 });
+        // generar SVG primero (no requiere canvas) y usarlo como data URL
+        try {
+            const svg = await QRCode.toString(texto, { type: 'svg', width: 180, margin: 1 });
+            if (svg) return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+        } catch (errSvg) {
+            // ignorar y probar PNG
+        }
+        // fallback: PNG data URL (requiere canvas); puede fallar en RN
+        try {
+            const png = await QRCode.toDataURL(texto, { margin: 1, width: 180 });
+            if (png) return png;
+        } catch (errPng) {
+            // ambos fallaron
+            console.error('Error generando QR (svg y png):', errPng?.message || errPng);
+        }
+        return null;
     } catch (error) {
-        console.error('Error generando QR en base64:', error);
+        console.error('Error inesperado generando QR:', error);
         return null;
     }
 };
@@ -278,15 +293,26 @@ export default function GeneradorPDF() {
             }
 
             const equiposConHistorial = await Promise.all(equipos.map(async (equipo) => {
+                // obtener historial y generar qrDataUrl (usamos generarQrDataUrl que prefiere SVG)
+                let historial = [];
                 try {
                     const respuesta = await axios.get(`${BASE_URL}/api/equipos/${equipo.id}`, { timeout: 8000 });
                     if (respuesta.data.success && respuesta.data.datos) {
-                        return { ...equipo, historial: respuesta.data.datos.historial || [] };
+                        historial = respuesta.data.datos.historial || [];
                     }
-                    return { ...equipo, historial: [] };
-                } catch {
-                    return { ...equipo, historial: [] };
+                } catch (err) {
+                    // ignorar error de historial
                 }
+
+                const qrTexto = JSON.stringify({ id: equipo.id, nombre_equipo: equipo.nombre_equipo, ubicacion: equipo.ubicacion, frecuencia_mantenimiento: equipo.frecuencia_mantenimiento });
+                let qrDataUrl = null;
+                try {
+                    qrDataUrl = await generarQrDataUrl(qrTexto);
+                } catch (err) {
+                    qrDataUrl = null;
+                }
+
+                return { ...equipo, historial, qrDataUrl };
             }));
 
             const secciones = equiposConHistorial.map((equipo) => {
@@ -304,13 +330,18 @@ export default function GeneradorPDF() {
                             <td style="padding: 10px; border: 1px solid #d1d5db;">${h.detalle}</td>
                         </tr>`).join('');
 
+                const placeholderSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><rect width='100%' height='100%' fill='#f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='12'>QR no disponible</text></svg>`;
+                const qrImg = equipo.qrDataUrl
+                    ? `<img src="${equipo.qrDataUrl}" alt="QR" style="width:120px;height:120px;display:block;margin-bottom:12px;object-fit:contain;border-radius:6px;" />`
+                    : `<img src="data:image/svg+xml;utf8,${encodeURIComponent(placeholderSvg)}" alt="QR-placeholder" style="width:120px;height:120px;display:block;margin-bottom:12px;object-fit:contain;border-radius:6px;" />`;
+
                 return `
                     <div class="equipo-card">
                         <h2>${equipo.nombre_equipo} (ID ${equipo.id})</h2>
+                        ${qrImg}
                         <p><strong>Ubicación:</strong> ${equipo.ubicacion}</p>
                         <p><strong>Última revisión:</strong> ${equipo.ultima_revision ? new Date(equipo.ultima_revision).toLocaleDateString('es-VE') : 'No registrada'}</p>
                         <p><strong>Frecuencia de mantenimiento:</strong> ${equipo.frecuencia_mantenimiento || 'No registrada'} días</p>
-                        <p><strong>Código QR:</strong> ${qrTexto}</p>
                         <h3>Historial</h3>
                         <table>
                             <thead>
@@ -335,6 +366,8 @@ export default function GeneradorPDF() {
                         h1 { font-size: 28px; margin-bottom: 6px; color: #1f2937; }
                         p.lead { margin: 0 0 22px; color: #475569; }
                         .equipo-card { background: #fff; border-radius: 18px; padding: 22px; margin-bottom: 20px; box-shadow: 0 18px 40px rgba(15,23,42,0.05); }
+                        .equipo-card { page-break-inside: avoid; break-inside: avoid; }
+                        img { max-width: 160px; max-height: 160px; }
                         h2 { margin: 0 0 10px; font-size: 20px; color: #1e293b; }
                         p { margin: 4px 0; line-height: 1.55; }
                         table { width: 100%; border-collapse: collapse; margin-top: 14px; }
@@ -536,6 +569,90 @@ export default function GeneradorPDF() {
         }
     };
 
+    const generarPdfTareas = async () => {
+        setGenerando(true);
+        try {
+            const res = await axios.get(`${BASE_URL}/listar-tareas`, { timeout: 8000 });
+            if (!res.data.success || !Array.isArray(res.data.tareas) || res.data.tareas.length === 0) {
+                mostrarError('No hay tareas registradas para generar el PDF.');
+                return;
+            }
+
+            const tareasList = res.data.tareas;
+            const agrupar = { pendiente: [], enproceso: [], finalizado: [], otros: [] };
+            tareasList.forEach(t => {
+                const s = (t.estado || '').toString().trim().toLowerCase();
+                if (s.includes('pend')) agrupar.pendiente.push(t);
+                else if (s.includes('proce')) agrupar.enproceso.push(t);
+                else if (s.includes('final') || s.includes('comp')) agrupar.finalizado.push(t);
+                else agrupar.otros.push(t);
+            });
+
+            const renderRows = (arr) => arr.length === 0 ? '<tr><td colspan="6" style="padding:10px">Sin registros.</td></tr>' : arr.map((it, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${it.id_tarea}</td>
+                    <td>${it.lugar || ''}</td>
+                    <td>${it.tarea || ''}</td>
+                    <td>${it.nombre_responsable || it.responsable || 'N/A'}</td>
+                    <td>${it.fecha_asignacion_formateada || ''}</td>
+                </tr>
+            `).join('');
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Historial de Tareas</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #111827; }
+                        .page { max-width: 820px; margin: 0 auto; }
+                        .section { background: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 12px 30px rgba(15,23,42,0.04); margin-bottom: 14px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                        th, td { border: 1px solid #d1d5db; padding: 10px 12px; }
+                        th { background: #eef2ff; }
+                    </style>
+                </head>
+                <body>
+                    <div class="page">
+                        <h1>Historial de Tareas</h1>
+                        <div class="section">
+                            <h2>Pendientes</h2>
+                            <table>
+                                <thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead>
+                                <tbody>${renderRows(agrupar.pendiente)}</tbody>
+                            </table>
+                        </div>
+                        <div class="section">
+                            <h2>En Proceso</h2>
+                            <table>
+                                <thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead>
+                                <tbody>${renderRows(agrupar.enproceso)}</tbody>
+                            </table>
+                        </div>
+                        <div class="section">
+                            <h2>Finalizadas</h2>
+                            <table>
+                                <thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead>
+                                <tbody>${renderRows(agrupar.finalizado)}</tbody>
+                            </table>
+                        </div>
+                        ${agrupar.otros.length ? `<div class="section"><h2>Otros</h2><table><thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead><tbody>${renderRows(agrupar.otros)}</tbody></table></div>` : ''}
+                        <div style="margin-top:18px;font-size:12px;color:#6b7280;text-align:center">Posada Villa Montaña · Historial de tareas</div>
+                    </div>
+                </body>
+                </html>`;
+
+            await generarPdfDesdeHtml(html, 'Historial-Tareas');
+        } catch (error) {
+            console.error('Error generando PDF de tareas:', error);
+            mostrarError('No se pudo generar el PDF de tareas. Intenta de nuevo más tarde.');
+        } finally {
+            setGenerando(false);
+        }
+    };
+
     const generarPdfUsuariosActivos = async () => {
         setGenerando(true);
         try {
@@ -655,7 +772,7 @@ export default function GeneradorPDF() {
     const generarPdfTodoSistema = async () => {
         setGenerando(true);
         try {
-            const [consumoAguaResp, consumoLuzResp, accesosResp, banosResp, habitacionesResp, usuariosActivosResp, usuariosInactivosResp, equiposResp] = await Promise.all([
+            const [consumoAguaResp, consumoLuzResp, accesosResp, banosResp, habitacionesResp, usuariosActivosResp, usuariosInactivosResp, equiposResp, tareasResp] = await Promise.all([
                 axios.get(`${BASE_URL}/calcular-consumo`, { params: { tipo: 'Agua', mes, anio }, timeout: 8000 }).catch(() => null),
                 axios.get(`${BASE_URL}/calcular-consumo`, { params: { tipo: 'Luz', mes, anio }, timeout: 8000 }).catch(() => null),
                 axios.get(`${BASE_URL}/historial-accesos`, { timeout: 8000 }).catch(() => null),
@@ -664,6 +781,7 @@ export default function GeneradorPDF() {
                 axios.get(`${BASE_URL}/listausuarios`, { timeout: 8000 }).catch(() => null),
                 axios.get(`${BASE_URL}/usuariosinactivos`, { timeout: 8000 }).catch(() => null),
                 axios.get(`${BASE_URL}/api/equipos`, { timeout: 8000 }).catch(() => null),
+                axios.get(`${BASE_URL}/listar-tareas`, { timeout: 8000 }).catch(() => null),
             ]);
 
             const equipos = (equiposResp?.data?.success && Array.isArray(equiposResp.data.datos)) ? equiposResp.data.datos : [];
@@ -748,6 +866,8 @@ export default function GeneradorPDF() {
                 </tr>
             `).join('') || '<tr><td colspan="4">No hay usuarios inactivos registrados.</td></tr>';
 
+            const tareas = (tareasResp?.data?.success && Array.isArray(tareasResp.data.tareas)) ? tareasResp.data.tareas : [];
+
             const htmlEquipos = equiposConHistorial.map((equipo) => {
                 const qrImg = equipo.qrDataUrl
                     ? `<img src="${equipo.qrDataUrl}" alt="QR" style="width: 120px; height: 120px; display: block; margin-bottom: 16px;" />`
@@ -771,6 +891,40 @@ export default function GeneradorPDF() {
                     </div>`;
             }).join('');
 
+            // construir sección tareas para el PDF completo
+            const tareasAgrupadas = { pendiente: [], enproceso: [], finalizado: [], otros: [] };
+            tareas.forEach(t => {
+                const s = (t.estado || '').toString().trim().toLowerCase();
+                if (s.includes('pend')) tareasAgrupadas.pendiente.push(t);
+                else if (s.includes('proce')) tareasAgrupadas.enproceso.push(t);
+                else if (s.includes('final') || s.includes('comp')) tareasAgrupadas.finalizado.push(t);
+                else tareasAgrupadas.otros.push(t);
+            });
+
+            const renderTaskRows = (arr) => arr.length === 0 ? '<tr><td colspan="6">Sin registros.</td></tr>' : arr.map((it, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${it.id_tarea}</td>
+                    <td>${it.lugar || ''}</td>
+                    <td>${it.tarea || ''}</td>
+                    <td>${it.nombre_responsable || it.responsable || 'N/A'}</td>
+                    <td>${it.fecha_asignacion_formateada || ''}</td>
+                </tr>
+            `).join('');
+
+            const htmlTareas = `
+                <div class="section">
+                    <h2>Historial de Tareas</h2>
+                    <h3>Pendientes</h3>
+                    <table><thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead><tbody>${renderTaskRows(tareasAgrupadas.pendiente)}</tbody></table>
+                    <h3>En Proceso</h3>
+                    <table><thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead><tbody>${renderTaskRows(tareasAgrupadas.enproceso)}</tbody></table>
+                    <h3>Finalizadas</h3>
+                    <table><thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead><tbody>${renderTaskRows(tareasAgrupadas.finalizado)}</tbody></table>
+                    ${tareasAgrupadas.otros.length ? `<h3>Otros</h3><table><thead><tr><th>#</th><th>ID</th><th>Lugar</th><th>Tarea</th><th>Responsable</th><th>Asignada</th></tr></thead><tbody>${renderTaskRows(tareasAgrupadas.otros)}</tbody></table>` : ''}
+                </div>
+            `;
+
             const html = `
                 <!DOCTYPE html>
                 <html lang="es">
@@ -783,6 +937,8 @@ export default function GeneradorPDF() {
                         h1, h2, h3 { color: #111827; }
                         h1 { margin-bottom: 6px; font-size: 28px; }
                         .section { background: #fff; border-radius: 20px; padding: 22px; box-shadow: 0 20px 40px rgba(15,23,42,0.05); margin-bottom: 20px; }
+                        .equipo-card { page-break-inside: avoid; break-inside: avoid; }
+                        img { max-width: 160px; max-height: 160px; }
                         .section + .section { margin-top: 16px; }
                         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
                         th, td { border: 1px solid #d1d5db; padding: 10px 12px; }
@@ -835,6 +991,7 @@ export default function GeneradorPDF() {
                                 <tbody>${filasUsuariosInactivos}</tbody>
                             </table>
                         </div>
+                        ${htmlTareas}
                         <div class="section">
                             <h2>Inventario de equipos QR</h2>
                             ${htmlEquipos || '<p>No hay equipos QR registrados.</p>'}
@@ -937,6 +1094,14 @@ export default function GeneradorPDF() {
                     <Text style={styles.sectionText}>Genera un PDF con el estado actual de las habitaciones.</Text>
                     <TouchableOpacity style={styles.buttonAlt} onPress={generarPdfHabitaciones} disabled={generando} activeOpacity={0.8}>
                         {generando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Generar PDF de Habitaciones</Text>}
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Historial de Tareas</Text>
+                    <Text style={styles.sectionText}>Genera un PDF con el historial de tareas clasificadas por estado.</Text>
+                    <TouchableOpacity style={styles.buttonAlt} onPress={generarPdfTareas} disabled={generando} activeOpacity={0.8}>
+                        {generando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Generar PDF de Tareas</Text>}
                     </TouchableOpacity>
                 </View>
 
