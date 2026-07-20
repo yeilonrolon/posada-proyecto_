@@ -37,7 +37,7 @@ app.use('/', apiRoutes);
 // ============================================================
 // ARRANQUE DEL SERVIDOR
 // ============================================================
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`
@@ -45,7 +45,7 @@ app.listen(PORT, '0.0.0.0', () => {
     🏨 SISTEMA POSADA VILLA MONTAÑA - BACKEND V2
     🟢 Estado: Corriendo con Seguridad de Intentos
     📍 URL Local: http://localhost:${PORT}
-    📍 Red Local: http://192.168.1.24:${PORT}
+    📍 Red Local: http://192.168.0.108${PORT}
     ================================================
     `);
 });
