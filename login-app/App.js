@@ -4,6 +4,7 @@ import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 
 // Pantallas
 import Login from "./screens/Login"; 
@@ -32,6 +33,22 @@ import ListaTareas from './screens/ListaTareas';
 
 const Stack = createStackNavigator();
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+async function solicitarPermisos() {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    console.log('No se dieron permisos para notificaciones');
+  }
+}
+
 // ✅ Extraemos la configuración para evitar re-crearla en cada re-render
 const getScreenOptions = (navigation) => ({
   headerTintColor: 'white',
@@ -57,6 +74,10 @@ const getScreenOptions = (navigation) => ({
 });
 
 export default function App() {
+  React.useEffect(() => {
+    solicitarPermisos();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
