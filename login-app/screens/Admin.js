@@ -23,16 +23,48 @@ const RenderBotonAdmin = ({ titulo, subtitulo, icono, libreria: LibreriaIcono, c
     );
 };
 
-const ResumenIndicador = ({ titulo, valor, detalle, color }) => (
+const ResumenIndicador = ({ titulo, valor, detalle, color, etiqueta }) => (
     <View style={styles.cardResumen}>
         <View style={[styles.barraColor, { backgroundColor: color }]} />
         <View style={styles.contenidoResumen}>
             <Text style={styles.valorResumen}>{valor}</Text>
             <Text style={styles.tituloResumen}>{titulo}</Text>
+            {etiqueta ? (
+                <View style={[styles.badgeResumen, { backgroundColor: `${color}15` }]}>
+                    <Text style={[styles.badgeTexto, { color }]}>{etiqueta}</Text>
+                </View>
+            ) : null}
             <Text style={styles.detalleResumen}>{detalle}</Text>
         </View>
     </View>
 );
+
+const obtenerNivelConsumo = (valor, tipo = 'Agua') => {
+    if (tipo === 'Luz') {
+        if (valor > 50) return 'alto';
+        if (valor >= 25) return 'medio';
+        return 'normal';
+    }
+
+    if (valor > 24) return 'alto';
+    if (valor >= 12) return 'medio';
+    return 'normal';
+};
+
+const formatearNivel = (nivel) => `${nivel.charAt(0).toUpperCase()}${nivel.slice(1)}`;
+
+const obtenerRangosResumen = () => 'Agua: <12 · 12-24 · >24\nLuz: <25 · 25-50 · >50';
+
+const obtenerTextoEstado = (valor, tipo) => {
+    const nivel = obtenerNivelConsumo(valor, tipo);
+    return `${valor.toFixed(1)} · ${formatearNivel(nivel)}`;
+};
+
+const prioridadNivel = {
+    normal: 0,
+    medio: 1,
+    alto: 2,
+};
 
 export default function Admin({ route, navigation }) {
     // Extraemos las credenciales y el rol que vienen desde el Login
@@ -104,15 +136,25 @@ export default function Admin({ route, navigation }) {
                 ).length
                 : 0;
 
+            const nivelAgua = obtenerNivelConsumo(consumoAgua, 'Agua');
+            const nivelLuz = obtenerNivelConsumo(consumoLuz, 'Luz');
             const consumoTotal = Number((consumoAgua + consumoLuz).toFixed(2));
-            const consumoElevado = consumoTotal >= 80;
 
             setResumenData({
                 consumoAgua,
                 consumoLuz,
                 tareasPendientes,
+                nivelAgua,
+                nivelLuz,
                 cargando: false,
             });
+
+            const consumoPriorizado = [
+                { recurso: 'Agua', valor: consumoAgua, nivel: nivelAgua },
+                { recurso: 'Luz', valor: consumoLuz, nivel: nivelLuz },
+            ]
+                .filter((item) => item.nivel !== 'normal')
+                .sort((a, b) => prioridadNivel[b.nivel] - prioridadNivel[a.nivel])[0];
 
             const alerta = tareasPendientes > 0
                 ? {
@@ -121,17 +163,19 @@ export default function Admin({ route, navigation }) {
                     tipo: 'tareas',
                     valor: tareasPendientes,
                 }
-                : consumoElevado
+                : consumoPriorizado
                     ? {
-                        titulo: 'Consumo elevado',
-                        cuerpo: `El consumo de agua y luz del mes está alto (${consumoTotal})`,
+                        titulo: `Consumo ${consumoPriorizado.nivel}`,
+                        cuerpo: `El consumo de ${consumoPriorizado.recurso.toLowerCase()} del mes está ${consumoPriorizado.nivel} (${consumoPriorizado.valor.toFixed(1)})`,
                         tipo: 'consumo',
-                        valor: consumoTotal,
+                        recurso: consumoPriorizado.recurso,
+                        nivel: consumoPriorizado.nivel,
+                        valor: consumoPriorizado.valor,
                     }
                     : null;
 
             if (alerta) {
-                const clave = `${alerta.tipo}:${alerta.valor}`;
+                const clave = `${alerta.tipo}:${alerta.recurso || ''}:${alerta.nivel || ''}:${alerta.valor}`;
                 if (ultimaAlertaRef.current !== clave) {
                     ultimaAlertaRef.current = clave;
                     Alert.alert(alerta.titulo, alerta.cuerpo);
@@ -157,7 +201,15 @@ export default function Admin({ route, navigation }) {
     );
 
     const consumoTotal = Number((resumenData.consumoAgua + resumenData.consumoLuz).toFixed(2));
-    const consumoElevado = consumoTotal >= 80;
+    const nivelAgua = obtenerNivelConsumo(resumenData.consumoAgua, 'Agua');
+    const nivelLuz = obtenerNivelConsumo(resumenData.consumoLuz, 'Luz');
+    const consumoPriorizado = [
+        { recurso: 'Agua', valor: resumenData.consumoAgua, nivel: nivelAgua },
+        { recurso: 'Luz', valor: resumenData.consumoLuz, nivel: nivelLuz },
+    ]
+        .filter((item) => item.nivel !== 'normal')
+        .sort((a, b) => prioridadNivel[b.nivel] - prioridadNivel[a.nivel])[0];
+
     const estadoGeneral = resumenData.tareasPendientes > 0
         ? {
             titulo: 'Mantenimiento pendiente',
@@ -167,17 +219,19 @@ export default function Admin({ route, navigation }) {
             tipo: 'tareas',
             valor: resumenData.tareasPendientes,
         }
-        : consumoElevado
+        : consumoPriorizado
             ? {
-                titulo: 'Consumo elevado',
-                cuerpo: `El consumo del mes está alto (${consumoTotal})`,
+                titulo: `Consumo ${consumoPriorizado.nivel}`,
+                cuerpo: `El consumo de ${consumoPriorizado.recurso.toLowerCase()} del mes está ${consumoPriorizado.nivel} (${consumoPriorizado.valor.toFixed(1)})`,
                 destino: 'CrearLuzAgua',
                 boton: 'Registrar consumo',
                 tipo: 'consumo',
-                valor: consumoTotal,
+                recurso: consumoPriorizado.recurso,
+                nivel: consumoPriorizado.nivel,
+                valor: consumoPriorizado.valor,
             }
             : null;
-    const claveAlerta = estadoGeneral ? `${estadoGeneral.tipo}:${estadoGeneral.valor}` : '';
+    const claveAlerta = estadoGeneral ? `${estadoGeneral.tipo}:${estadoGeneral.recurso || ''}:${estadoGeneral.nivel || ''}:${estadoGeneral.valor}` : '';
     const mostrarAlerta = Boolean(estadoGeneral && alertaLeidaKey !== claveAlerta);
     const showNotificationIcon = Boolean(estadoGeneral && alertaLeidaKey !== claveAlerta);
 
@@ -222,12 +276,12 @@ export default function Admin({ route, navigation }) {
             return;
         }
 
-        const claveActual = `${estadoGeneral.tipo}:${estadoGeneral.valor}`;
+        const claveActual = `${estadoGeneral.tipo}:${estadoGeneral.recurso || ''}:${estadoGeneral.nivel || ''}:${estadoGeneral.valor}`;
         if (ultimaCondicionRef.current !== claveActual) {
             ultimaCondicionRef.current = claveActual;
             setAlertaLeidaKey('');
         }
-    }, [estadoGeneral?.tipo, estadoGeneral?.valor]);
+    }, [estadoGeneral?.tipo, estadoGeneral?.recurso, estadoGeneral?.nivel, estadoGeneral?.valor]);
 
     return (
         <SafeAreaView style={styles.contenedor}>
@@ -277,10 +331,15 @@ export default function Admin({ route, navigation }) {
 
                     <View style={styles.resumenGrid}>
                         <ResumenIndicador
-                            titulo="Consumo"
-                            valor={resumenData.cargando ? '...' : `${consumoTotal}`}
-                            detalle={consumoElevado ? 'Consumo elevado este mes' : 'Consumo estable'}
-                            color={consumoElevado ? '#ef4444' : '#10b981'}
+                            titulo="Estado del mes"
+                            valor={resumenData.cargando ? '...' : formatearNivel(consumoPriorizado?.nivel || 'normal')}
+                            detalle={
+                                consumoPriorizado
+                                    ? `${consumoPriorizado.recurso}: ${consumoPriorizado.valor.toFixed(1)} · ${formatearNivel(consumoPriorizado.nivel)}`
+                                    : 'Agua y luz estables'
+                            }
+                            etiqueta={consumoPriorizado ? 'Atención' : 'Estable'}
+                            color={consumoPriorizado ? '#ef4444' : '#10b981'}
                         />
                         <ResumenIndicador
                             titulo="Mantenimiento"
@@ -291,7 +350,12 @@ export default function Admin({ route, navigation }) {
                         <ResumenIndicador
                             titulo="Agua / Luz"
                             valor={resumenData.cargando ? '...' : `${resumenData.consumoAgua.toFixed(1)} / ${resumenData.consumoLuz.toFixed(1)}`}
-                            detalle="Lecturas del mes actual"
+                            detalle={
+                                resumenData.cargando
+                                    ? 'Cargando consumo...'
+                                    : `${obtenerTextoEstado(resumenData.consumoAgua, 'Agua')}\n${obtenerTextoEstado(resumenData.consumoLuz, 'Luz')}`
+                            }
+                            etiqueta="Consumo"
                             color="#3b82f6"
                         />
                     </View>
@@ -565,12 +629,17 @@ const styles = StyleSheet.create({
     cardResumen: {
         flexBasis: '31%',
         minWidth: 100,
-        backgroundColor: '#f8fafc',
-        borderRadius: 14,
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
         padding: 12,
         marginBottom: 8,
         borderWidth: 1,
         borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 1,
     },
     barraColor: {
         width: 36,
@@ -595,8 +664,20 @@ const styles = StyleSheet.create({
     detalleResumen: {
         fontSize: 10,
         color: '#64748b',
-        marginTop: 4,
+        marginTop: 6,
         lineHeight: 14,
+    },
+    badgeResumen: {
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        marginTop: 6,
+    },
+    badgeTexto: {
+        fontSize: 9,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
     },
     tarjetaBoton: { 
         backgroundColor: '#ffffff', 
