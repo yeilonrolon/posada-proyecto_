@@ -34,6 +34,38 @@ router.post('/registro-costo', async(req,res) =>{
     }
 });
 
+router.delete('/eliminar-costo/:id_costo', async (req, res) => {
+    const { id_costo } = req.params;
+    try {
+        
+        const query = `
+            DELETE FROM public.costo_manterimiento 
+            WHERE id_costo = $1 
+            RETURNING *;
+        `;
+        const resultado = await pool.query(query, [id_costo]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                mensaje: 'El registro ya no se encuentra disponible (pudo ser eliminado por otro usuario).' 
+            });
+        }
+
+       
+        return res.status(200).json({ 
+            success: true, 
+            mensaje: 'Registro de costo eliminado correctamente.'
+        });
+
+    } catch (error) {
+        console.error('❌ Error al borrar el registro:', error.message);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
 router.get('/listar-costo-reparacion', async (req, res) =>{
     try{
         const query = `

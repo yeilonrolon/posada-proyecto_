@@ -72,6 +72,10 @@ export default function RegistroCosto({ navigation, route }) {
             Alert.alert('Campos Incompletos 🛑', 'Por favor complete todos los campos obligatorios.');
             return;
         }
+        if(materiales.trim().length < 5){
+            Alert.alert('Campos Incompletos 🛑', 'Por favor utilize un minimo de 5 carcetres para los materiales.');
+            return;
+        }
 
         if (!idUsuario) {
             return Alert.alert("Error de Sesión", "No se detectó el ID del usuario. Por favor, reinicia sesión.");

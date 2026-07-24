@@ -86,6 +86,10 @@ export default function MisTareasAsignadas({ route }) {
             Alert.alert('Nota Requerida ⚠️', 'Por favor escribe el resumen del trabajo técnico realizado.');
             return;
         }
+        if (notaCierre.trim().length < 5) {
+            Alert.alert('Nota Requerida ⚠️', 'Por favor escribe el resumen del trabajo técnico realizado completo.');
+            return;
+        }
 
         setGuardandoCambio(true);
         try {

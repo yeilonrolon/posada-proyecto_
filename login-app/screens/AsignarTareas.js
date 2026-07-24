@@ -79,6 +79,9 @@ export default function AsignarTareas({ navigation, route }) {
         if (!idUsuario) {
             return Alert.alert("Error de Sesión", "No se detectó tu ID de usuario. Por favor, reinicia sesión.");
         }
+         if (tarea.trim().length < 5) {
+            return Alert.alert("Campo incompleto", "utilize un minimo de 5 caracteres para la tarea");
+        }
 
         const textoAlerta = item && item.id_tarea 
             ? '¿Está seguro de querer actualizar esta tarea?' 

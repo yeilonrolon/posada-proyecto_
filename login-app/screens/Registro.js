@@ -51,7 +51,7 @@ export default function RegistroUsuario({ navigation }) {
     const camposCompletos = 
         nombre.trim() && usuario.trim() && clave && rol && 
         pregunta1.trim() && respuesta1.trim() && 
-        pregunta2.trim() && respuesta2.trim();
+        pregunta2.trim() && respuesta2.trim() && nombre.trim().length > 4 && usuario.trim().length > 4;
 
     const botonHabilitado = todoValido && camposCompletos && !cargando;
 

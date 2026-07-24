@@ -23,8 +23,12 @@ export default function PantallaQR({ navigation, route }) {
 
   // 1. Registrar Activo en la Base de Datos y preparar JSON para QR
   const manejarGenerarYGuardarBD = async () => {
-    if (!nombreEquipo.trim() || !ubicacion.trim()) {
+    if (!nombreEquipo.trim() || !ubicacion.trim() ) {
       return Alert.alert('Campos Incompletos', 'Por favor ingresa el nombre del equipo y su ubicación.');
+    }
+    
+     if (nombreEquipo.trim().length < 6  || ubicacion.trim().length < 5 ) {
+      return Alert.alert('Campos Incompletos', 'Por favor ingrese un minimo de 5 caracteres ');
     }
 
     Keyboard.dismiss();

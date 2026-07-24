@@ -114,6 +114,10 @@ export default function PanelUsuarios() {
             Alert.alert("Atención", "Todos los campos son obligatorios.");
             return;
         }
+        if (nombreEdit.trim().length < 4) {
+            Alert.alert("Atención", "Ingrese un minimo de 4 caracteres para el nombre");
+            return;
+        }
         try {
             const res = await axios.put(`${API_URL}/actualizarusuario`, {
                 id: usuarioSeleccionado.id,
