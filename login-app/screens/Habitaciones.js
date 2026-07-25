@@ -55,7 +55,7 @@ export default function Habitaciones({ navigation, route }) {
     return (
         <View style={styles.contenedorPrincipal}>
             <View style={styles.headerTop}>
-                <Text style={styles.tituloHeader}>Estados de los habitaciones</Text>
+                <Text style={styles.tituloHeader}>Estados de las habitaciones</Text>
                 <Text style={styles.operadorHeader}>👤 {nombreUsuario}</Text>
             </View>
 
