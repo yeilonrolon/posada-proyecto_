@@ -30,13 +30,12 @@ import GeneradorPDF from './screens/GeneradorPDF';
 import AsignarTareas from './screens/AsignarTareas';
 import ListaTareas from './screens/ListaTareas';
 
-
 const Stack = createStackNavigator();
 
+// ✅ Configuración de notificaciones compatible con versiones recientes de Expo
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -45,11 +44,11 @@ Notifications.setNotificationHandler({
 async function solicitarPermisos() {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {
-    console.log('No se dieron permisos para notificaciones');
+    console.log('No se otorgaron permisos para notificaciones');
   }
 }
 
-// ✅ Extraemos la configuración para evitar re-crearla en cada re-render
+// ✅ Configuración del Header reutilizable
 const getScreenOptions = (navigation) => ({
   headerTintColor: 'white',
   headerTitleAlign: 'center', 
@@ -67,6 +66,7 @@ const getScreenOptions = (navigation) => ({
     <TouchableOpacity 
       onPress={() => navigation.replace('Login')}
       style={styles.btnLogout}
+      activeOpacity={0.7}
     >
       <Text style={styles.btnLogoutText}>Salir</Text>
     </TouchableOpacity>
@@ -83,7 +83,6 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator 
           initialRouteName="Login"
-          // ✅ Pasamos la referencia de navegación de manera limpia
           screenOptions={({ navigation }) => getScreenOptions(navigation)}
         >
           {/* Módulo de Acceso */}
@@ -110,54 +109,54 @@ export default function App() {
           <Stack.Screen 
             name="CrearLuzAgua" 
             component={CrearLuzAgua} 
-            options={{ title: 'REGISTRO DE GASTOS', headerRight: null }}
+            options={{ title: 'REGISTRO DE GASTOS', headerRight: () => null }}
           />
 
           <Stack.Screen 
             name="CalcularConsumo"
             component={CalcularConsumo}
-            options={{ title: 'CALCULAR CONSUMO', headerRight: null }}
+            options={{ title: 'CALCULAR CONSUMO', headerRight: () => null }}
           />
 
           {/* Gestión de Personal */}
           <Stack.Screen 
             name="Registro" 
             component={Registro} 
-            options={{ title: 'NUEVO OPERADOR', headerRight: null }} 
+            options={{ title: 'NUEVO OPERADOR', headerRight: () => null }} 
           />
 
           <Stack.Screen 
             name="PanelUsuarios"
             component={PanelUsuarios}
-            options={{ title: 'GESTIÓN DE USUARIOS', headerRight: null }}
+            options={{ title: 'GESTIÓN DE USUARIOS', headerRight: () => null }}
           />
 
           <Stack.Screen 
             name="MostrarUsuariosInactivos"
             component={MostrarUsuariosInactivos}
-            options={{ title: 'PAPELERA DE USUARIOS', headerRight: null }}
+            options={{ title: 'PAPELERA DE USUARIOS', headerRight: () => null }}
           />
 
-          {/* Auditoría */}
+          {/* Auditoría y Operaciones */}
           <Stack.Screen 
             name="HistorialAccesos" 
             component={HistorialAccesos} 
-            options={{ title: 'HISTORIAL DE INGRESOS', headerRight: null }} 
+            options={{ title: 'HISTORIAL DE INGRESOS', headerRight: () => null }} 
           />
           <Stack.Screen 
             name="RegistroEstadoBano"
             component={RegistroEstadoBano}
-            options={{ title: 'REGISTRO ESTADOS DE BAÑOS', headerRight: null }}
+            options={{ title: 'REGISTRO ESTADOS DE BAÑOS', headerRight: () => null }}
           />
           <Stack.Screen 
             name="EstadoBano"
             component={EstadoBano}
-            options={{ title: 'ESTADOS DE BAÑOS', headerRight: null }}
+            options={{ title: 'ESTADOS DE BAÑOS', headerRight: () => null }}
           />
           <Stack.Screen 
             name="Habitaciones"
             component={Habitaciones}
-            options={{ title: 'ESTADOS DE HABITACIONES', headerRight: null }}
+            options={{ title: 'ESTADOS DE HABITACIONES', headerRight: () => null }}
           />
           <Stack.Screen 
             name="MenuInferior"
@@ -169,18 +168,18 @@ export default function App() {
             component={RecuperacionClave}
             options={{ 
               title: 'RECUPERACIÓN DE CLAVE', 
-              headerRight: null 
+              headerRight: () => null 
             }}
           />
           <Stack.Screen 
             name="RegistroCosto" 
             component={RegistroCosto} 
-            options={{ title: 'REGISTRO DE COSTOS EXTRAS', headerRight: null }}
+            options={{ title: 'REGISTRO DE COSTOS EXTRAS', headerRight: () => null }}
           />
           <Stack.Screen 
             name="CostoReparacion" 
             component={CostoReparacion} 
-            options={{ title: 'HISTORIAL DE COSTOS DE REPARACION', headerRight: null }}
+            options={{ title: 'HISTORIAL DE COSTOS DE REPARACION', headerRight: () => null }}
           />
           <Stack.Screen 
             name="PantallaCamara" 
@@ -197,21 +196,20 @@ export default function App() {
             component={qr} 
             options={{ title: 'Control de Activos QR' }} 
           />
-
           <Stack.Screen 
             name="GeneradorPDF" 
             component={GeneradorPDF} 
-            options={{ title: 'GENERADOR DE PDF', headerRight: null }} 
+            options={{ title: 'GENERADOR DE PDF', headerRight: () => null }} 
           />
           <Stack.Screen 
             name="AsignarTareas"
             component={AsignarTareas}
-            options={{ title: 'ASIGNAR TAREAS',headerRight: null  }}
+            options={{ title: 'ASIGNAR TAREAS', headerRight: () => null }}
           />
           <Stack.Screen 
             name="ListaTareas"
             component={ListaTareas}
-            options={{ title: 'REGISTRO DE TAREAS',headerRight: null  }}
+            options={{ title: 'REGISTRO DE TAREAS', headerRight: () => null }}
           />
         </Stack.Navigator>
         <StatusBar style="light" />

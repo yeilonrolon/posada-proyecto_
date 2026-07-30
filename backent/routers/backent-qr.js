@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../db'); // Reutiliza la conexión existente a PostgreSQL
 
 // ============================================================================
-// ENDPOINT 1: ACTUALIZAR REVISIÓN Y GUARDAR EN HISTORIAL (CORRECCIÓN CRÍTICA)
+// ENDPOINT 1: ACTUALIZAR REVISIÓN Y GUARDAR EN HISTORIAL
 // ============================================================================
 router.put('/:id/revision', async (req, res) => {
     const { id } = req.params;
@@ -19,7 +19,6 @@ router.put('/:id/revision', async (req, res) => {
     }
 
     try {
-        // Validamos de forma estricta que llegue el nombre desde el frontend
         let nombreResponsable = 'Operario Técnico';
         const nombreRecibido = nombre_tecnico || nombre || nombreUsuario;
         if (nombreRecibido && String(nombreRecibido).trim() !== '') {
@@ -28,7 +27,7 @@ router.put('/:id/revision', async (req, res) => {
 
         console.log('📥 Cuerpo recibido en /revision:', { id, nueva_fecha, detalle: detalle?.trim(), nombreRecibido });
 
-        // 1. Actualizar la fecha de la última revisión en la tabla de equipos
+        // 1. Actualizar fecha de última revisión
         const queryText = `
             UPDATE equipos_qr 
             SET ultima_revision = $1::date 
@@ -37,10 +36,7 @@ router.put('/:id/revision', async (req, res) => {
         `;
         await pool.query(queryText, [nueva_fecha, idEquipo]);
 
-        // Log en la consola de Node para verificar en tiempo real qué string está entrando
-        console.log(`💾 Registrando en historial_qr -> Equipo: ${idEquipo} | Responsable: ${nombreResponsable}`);
-
-        // 2. Insertar directamente en el historial con el nombre recibido de la App
+        // 2. Insertar registro en historial
         const queryHistorial = `
             INSERT INTO historial_qr (equipo_id, responsable, fecha, detalle)
             VALUES ($1, $2, $3::date, $4);
@@ -132,7 +128,6 @@ router.get('/:id', async (req, res) => {
     }
 
     try {
-        // 1. Buscamos los datos del equipo
         const consultaSQL = `
             SELECT 
                 e.*, 
@@ -147,7 +142,6 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Equipo no encontrado en el sistema.' });
         }
 
-        // 2. Buscamos todo su historial cronológico
         const consultaHistorial = `
             SELECT 
                 id,
@@ -160,7 +154,6 @@ router.get('/:id', async (req, res) => {
         `;
         const resultadoHistorial = await pool.query(consultaHistorial, [idEquipo]);
 
-        // 3. Empaquetamos todo junto para el frontend
         res.json({ 
             success: true, 
             datos: {
@@ -238,6 +231,11 @@ router.delete('/:id', async (req, res) => {
         console.error('❌ Error al eliminar equipo:', error.message);
         res.status(500).json({ success: false, error: 'Error interno del servidor al eliminar el activo' });
     }
+});
+
+// Middleware para capturar cualquier ruta no encontrada dentro de este router y devolver JSON
+router.use((req, res) => {
+    res.status(404).json({ success: false, error: 'Ruta no encontrada en la API.' });
 });
 
 module.exports = router;

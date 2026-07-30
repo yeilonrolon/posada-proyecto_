@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  ScrollView, Alert,ActivityIndicator, Keyboard 
+  ScrollView, Alert, ActivityIndicator, Keyboard 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
-import * as FileSystem from 'expo-file-system';
+// ✅ Importación compatible para FileSystem
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BASE_URL } from './apiConfig';
@@ -27,8 +28,8 @@ export default function PantallaQR({ navigation, route }) {
       return Alert.alert('Campos Incompletos', 'Por favor ingresa el nombre del equipo y su ubicación.');
     }
     
-     if (nombreEquipo.trim().length < 6  || ubicacion.trim().length < 5 ) {
-      return Alert.alert('Campos Incompletos', 'Por favor ingrese un minimo de 5 caracteres ');
+    if (nombreEquipo.trim().length < 6  || ubicacion.trim().length < 5 ) {
+      return Alert.alert('Campos Incompletos', 'Por favor ingrese un mínimo de 5 caracteres.');
     }
 
     Keyboard.dismiss();
@@ -100,9 +101,14 @@ export default function PantallaQR({ navigation, route }) {
         return Alert.alert('Error', 'No se pudieron extraer los datos gráficos.');
       }
 
-      const archivoTemp = new FileSystem.File(FileSystem.Paths.cache, `QR_Activo_${Date.now()}.png`);
-      await FileSystem.writeAsStringAsync(archivoTemp.uri, dataURL, { encoding: 'base64' });
-      await MediaLibrary.saveToLibraryAsync(archivoTemp.uri);
+      // ✅ RUTA COMPATIBLE SIN USAR "new FileSystem.File"
+      const fileUri = `${FileSystem.cacheDirectory}QR_Activo_${Date.now()}.png`;
+
+      await FileSystem.writeAsStringAsync(fileUri, dataURL, { 
+        encoding: FileSystem.EncodingType.Base64 
+      });
+
+      await MediaLibrary.saveToLibraryAsync(fileUri);
       
       Alert.alert('¡Guardado Exitoso! 📥', 'El código QR se descargó en tu galería como imagen PNG. Está listo para imprimir.');
     } catch (error) {
